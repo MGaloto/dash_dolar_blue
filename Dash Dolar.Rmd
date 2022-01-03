@@ -48,12 +48,8 @@ library(ggthemes)
 library(viridisLite)
 library(dplyr)
 library(plotly)
-library(quantmod)
-library(highcharter)
 library(tidyverse)
 library(ggplot2)
-library(corrplot) 
-library(GGally)
 library(readr)  
 library(dplyr)  
 library(crayon) 
@@ -62,6 +58,8 @@ library(readxl)
 library(ggthemes)
 library(lubridate)
 library(gganimate)
+library(gapminder)
+library(gifski)
 
 ```
 
@@ -263,9 +261,6 @@ dl = dolar_final %>%
              label = " Inicio de la\nCuarentena\n 20/03/2020", 
              hjust = "left")
 
-animate(dl, nframes = 550, height = 700, width = 1000)
-
-
 
 
 
@@ -305,6 +300,10 @@ plot_ly(dolar_2011) %>%
          xaxis = list( title = 'Año'),
         legend = list(x = 1.05),
         hovermode = "compare") 
+
+
+
+
 
 ```
 

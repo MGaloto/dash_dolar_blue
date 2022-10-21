@@ -110,7 +110,9 @@ dolar$Variación = NULL
 
 # Importando Datos Históricos
 
-dolar_historico = read_excel('dolar_historico.xlsx')
+
+dolar_historico = read_excel('data/dolar_historico.xlsx')
+
 
 # Unificando Formatos
 
@@ -128,7 +130,7 @@ dolar_final$variacion = round(( dolar_final$Promedio - lag(dolar_final$Promedio,
 
 # Guardando .csv
 
-write.csv(dolar_final, 'dolarfinal.csv')
+#write.csv(dolar_final, 'dolarfinal.csv')
 
 
 ```
@@ -185,7 +187,8 @@ plot_ly() %>%
 
 ```{r}
 
-plot(y=dolar$Promedio, x=dolar$Fecha,
+plot(y = dolar$Promedio, 
+     x = dolar$Fecha,
      xlab = "Periodo",                
      ylab = "Tipo de Cambio",               
      main = "Observaciones Dolar Paralelo",      
@@ -194,24 +197,14 @@ plot(y=dolar$Promedio, x=dolar$Fecha,
      cex = 0.9)
 
 inicio_cuarentena = as.Date.character("2020/03/20")
-
 restricciones_cambiarias = as.Date.character("2020/09/15")
-
 abline(v = inicio_cuarentena)  # linea vertical
-
 abline(v = restricciones_cambiarias)  # linea vertical
-
-
 arrows(dolar$Fecha[90],90,inicio_cuarentena,85, col = "black")  # flecha
-
 text(dolar$Fecha[115],90,"Inicio \n Cuarentena \n 2020/03/20", cex = 0.7) # texto
-
 arrows(dolar$Fecha[200],119,restricciones_cambiarias,130, col = "black")  # flecha
-
 text(dolar$Fecha[225],110,"Mayores \n restricciones \n Cambiarias \n 2020/09/15", cex = 0.7) # texto
-
 arrows(dolar$Fecha[430],160,dolar$Fecha[440],180 , col = "black")  # flecha
-
 text(dolar$Fecha[425],148,"Salto previo \n a las elecciones \n 2021/10/22", cex = 0.7) # texto
 
 
@@ -273,7 +266,7 @@ dl
 
 dolar_final$año = year(dolar_final$Fecha)
 
-dolar_2011 = dolar_final %>% filter(año >2011)
+dolar_2011 = dolar_final %>% filter(año > 2011)
 
 plot_ly(dolar_2011) %>%
   add_lines(x = ~Fecha, y = ~variacion, 

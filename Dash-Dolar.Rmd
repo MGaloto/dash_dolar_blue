@@ -43,15 +43,9 @@ library(plotly)
 library(readxl)
 library(rvest)
 library(rsconnect)
-library(ggplot2)
-library(ggthemes)
 library(viridisLite)
-library(dplyr)
-library(plotly)
 library(tidyverse)
-library(ggplot2)
 library(readr)  
-library(dplyr)  
 library(crayon) 
 library(modeest)
 library(readxl)
@@ -67,97 +61,72 @@ library(gifski)
 
 ```{r}
 
-# web scraping
+get_ts_dolar = function(years, months) {
+  
+  vector_final = c()
+  datalist = list()
+  datalist = vector("list")
+  
+  counter = 1
+  for (i in 1:length(vector_years)) {
+    counter = counter + 1
+    year = vector_years[i]
+    
+    for (i in 1:length(vectror_months)) {
+      counter = counter + 1
+      month = vectror_months[i]
+      vector_final[counter] = paste0(month, '-', year)
+    }
+  }
+  
+  
+  for (i in 1:length(vector_final)) {
+
+    skip_to_next <- FALSE
+    link = paste0('https://dolarhistorico.com/cotizacion-dolar-blue/mes/',vector_final[i])
+    data = as.data.frame(rvest::html_table(read_html(link)))
+    datalist[[i]] <- data
+    tryCatch(print(b), error = function(e) {skip_to_next <<- TRUE})
+  
+    if( skip_to_next ) { next }    
+      
+  }
+  
+  dolar = do.call(rbind, datalist)
+  return(dolar)
+}
 
 
-
-enero20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/enero-2020")))
-
-febrero20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/febrero-2020")))
-
-marzo20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/marzo-2020")))
-
-abril20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/abril-2020")))
-
-mayo20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/mayo-2020")))
-
-junio20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/junio-2020")))
-
-julio20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/julio-2020")))
-
-agosto20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/agosto-2020")))
-
-septiembre20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/septiembre-2020")))
-
-octubre20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/octubre-2020")))
-
-noviembre20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/noviembre-2020")))
-
-diciembre20 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/diciembre-2020")))
-
-enero21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/enero-2021")))
-
-febrero21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/febrero-2021")))
-
-marzo21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/marzo-2021")))
-
-abril21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/abril-2021")))
-
-mayo21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/mayo-2021")))
-
-junio21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/junio-2021")))
-
-julio21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/julio-2021")))
-
-agosto21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/agosto-2021")))
-
-septiembre21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/septiembre-2021")))
-
-octubre21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/octubre-2021")))
-
-noviembre21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/noviembre-2021")))
+vector_years   = c(2020:year(today()))
+vectror_months = c('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
 
 
-
-diciembre21 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/diciembre-2021")))
-
-enero22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/enero-2022")))
-
-febrero22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/febrero-2022")))
-
-marzo22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/marzo-2022")))
-
-abril22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/abril-2022")))
-
-mayo22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/mayo-2022")))
-
-junio22 = as.data.frame(html_table(read_html("https://dolarhistorico.com/cotizacion-dolar-blue/mes/junio-2022")))
+dolar = get_ts_dolar(vector_years, vectror_months)
 
 
-dolar = rbind(enero20, febrero20, marzo20, abril20, mayo20, junio20, julio20, agosto20, septiembre20, octubre20, noviembre20, diciembre20, enero21, febrero21, marzo21, abril21, mayo21, junio21, julio21, agosto21, septiembre21,octubre21,noviembre21, diciembre21, enero22, febrero22, marzo22, abril22,mayo22, junio22 )
+# Editando Variables
 
 dolar$Variación = NULL
 
+# Importando Datos Históricos
+
 dolar_historico = read_excel('dolar_historico.xlsx')
 
+# Unificando Formatos
 
 dolar_historico$Fecha = as.Date(dolar_historico$Fecha)
-
 dolar$Compra = round(as.numeric(gsub(",", ".", dolar$Compra)),2)
-
 dolar$Venta = round(as.numeric(gsub(",", ".", dolar$Venta)),2)
-
 dolar$Promedio = (dolar$Compra + dolar$Venta) / 2
-
 dolar$Fecha = as.Date(dolar$Fecha, format = "%d/%m/%Y")
 
-
+# Data Final
 
 dolar_final = bind_rows(dolar_historico, dolar)
 
-
 dolar_final$variacion = round(( dolar_final$Promedio - lag(dolar_final$Promedio, 1) ) / lag(dolar_final$Promedio, 1),2)
 
+# Guardando .csv
 
 write.csv(dolar_final, 'dolarfinal.csv')
 
@@ -180,12 +149,32 @@ Column {.tabset}
 ```{r}
 
 
-fig <- plot_ly()
-fig <- fig %>% add_lines(y = dolar$Promedio , name = "Promedio", x=dolar$Fecha ,line = list(shape = "spline"))
-fig <- fig %>% add_lines(y = ~dolar$Venta, x=~dolar$Fecha ,type = 'scatter', mode = 'lines',line = list(color = 'transparent'), fill = 'tonexty', fillcolor='rgb(192, 189, 196)',showlegend = FALSE, name = 'Precio Venta')
-fig <- fig %>% add_lines(y = ~dolar$Compra, x=~dolar$Fecha ,type = 'scatter', mode = 'lines', line = list(color = 'transparent'), fill = 'tonexty', showlegend = FALSE, name = 'Precio Compra')
-fig <- fig %>% layout(title = "Dolar Paralelo promedio 2020 - 2021", xaxis = list(title = 'Periodo'), yaxis = list (title = 'Tipo de Cambio'))
-fig
+plot_ly() %>% 
+  add_lines(y = dolar$Promedio, 
+            name = "Promedio", 
+            x = dolar$Fecha,
+            line = list(shape = "spline")) %>% 
+  add_lines(y = ~dolar$Venta,
+            x = ~dolar$Fecha,
+            type = 'scatter',
+            mode = 'lines',
+            line = list(color = 'transparent'), 
+            fill = 'tonexty', 
+            fillcolor='rgb(192, 189, 196)',
+            showlegend = FALSE, 
+            name = 'Precio Venta') %>% 
+  add_lines(y = ~dolar$Compra, 
+            x = ~dolar$Fecha ,
+            type = 'scatter', 
+            mode = 'lines', 
+            line = list(color = 'transparent'), 
+            fill = 'tonexty', 
+            showlegend = FALSE, 
+            name = 'Precio Compra') %>% 
+  layout(title = paste0("Dolar Paralelo promedio 2020 - ",year(today())), 
+         xaxis = list(title = 'Periodo'), 
+         yaxis = list (title = 'Tipo de Cambio'))
+
 
 
 ```
@@ -237,9 +226,8 @@ text(dolar$Fecha[425],148,"Salto previo \n a las elecciones \n 2021/10/22", cex 
 ```{r, warning=FALSE}
 
 
+
 dolar_final$Promedio = round(dolar_final$Promedio,2)
-
-
 dl = dolar_final %>% 
   ggplot(aes(x = Fecha, y = Promedio)) + 
     geom_path(aes(x = Fecha, y = Promedio), alpha = 0.7, size = 1.5, width = 1, color = '#39ad58') + 
@@ -271,7 +259,6 @@ dl = dolar_final %>%
              label = " Inicio de la\nCuarentena\n 20/03/2020", 
              hjust = "left")
 dl
-
 ```
 
 

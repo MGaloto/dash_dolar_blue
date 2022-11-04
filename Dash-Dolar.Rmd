@@ -130,7 +130,7 @@ dolar_final$variacion = round(( dolar_final$Promedio - lag(dolar_final$Promedio,
 
 # Guardando .csv
 
-#write.csv(dolar_final, 'dolarfinal.csv')
+#write.csv(dolar_final, 'data/dolarfinal.csv')
 
 
 ```

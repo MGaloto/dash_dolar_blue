@@ -47,12 +47,10 @@ library(viridisLite)
 library(tidyverse)
 library(readr)  
 library(crayon) 
-
 library(modeest)
 library(readxl)
 library(ggthemes)
 library(lubridate)
-
 library(gganimate)
 library(gapminder)
 library(gifski)

@@ -23,7 +23,8 @@ deployApp(appName="dolartrends",
                        "etl.R",
                        "data/dolar.xlsx",
                        "data/dolarmep.xlsx",
-                       "data/dolaroficial.xlsx"))
+                       "data/dolaroficial.xlsx"),
+          forceUpdate = TRUE)
 
 
 

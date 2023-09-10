@@ -1,0 +1,31 @@
+name: Update Data and Deploy
+
+on: 
+  push:
+    branches: [main]
+  schedule:  
+    - cron: '0 14,18,21 * * 1-5'
+
+jobs:
+  refresh-the-dashboard:
+    runs-on: ubuntu-latest 
+    permissions:
+      contents: write
+      actions: write
+      pages: write
+    container: 
+      image: mgaloto/bs4dashdolar:04
+    steps:
+    - name: checkout_repo
+      uses: actions/checkout@v3
+      with: 
+        ref: 'main'
+    - name: Render Update
+      run: bash ./bash/render_dashboard.sh "MGaloto" "maxigaloto@hotmail.com"
+    - name: Deploy app
+      run: Rscript R/deploy.R
+      env:
+        SHINY_ACC_NAME: ${{ secrets.SHINY_ACC_NAME }}
+        TOKEN: ${{ secrets.TOKEN }}
+        SECRET: ${{ secrets.SECRET }}
+

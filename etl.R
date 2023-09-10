@@ -7,7 +7,6 @@ library(lubridate)
 library(openxlsx)
 
 
-
 URL = 'https://dolarhistorico.com/cotizacion-dolar-blue/mes/'
 URL_BLUE = "https://dolarhoy.com/cotizaciondolarblue"
 URL_MEP = "https://dolarhoy.com/cotizaciondolarbolsa"

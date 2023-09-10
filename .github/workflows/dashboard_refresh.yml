@@ -14,7 +14,7 @@ jobs:
       actions: write
       pages: write
     container: 
-      image: mgaloto/bs4dashdolar:06
+      image: mgaloto/bs4dashdolar:07
     steps:
     - name: checkout_repo
       uses: actions/checkout@v3

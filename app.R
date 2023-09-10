@@ -14,7 +14,6 @@ library(openxlsx)
 
 
 
-
 today = format(
   with_tz(
     Sys.time() ,

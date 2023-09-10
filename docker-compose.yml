@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   rstudio:
-    image: "mgaloto/bs4dashdolar:04" 
+    image: "mgaloto/bs4dashdolar:05" 
     ports:
       - "8787:8787"
     volumes:

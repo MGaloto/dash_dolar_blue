@@ -3,8 +3,8 @@ name: Update Data and Deploy
 on: 
   push:
     branches: [main]
-  #schedule:  
-  #  - cron: '0 14,18,21 * * 1-5'
+  schedule:  
+    - cron: '0 14,18,21 * * 1-5'
 
 jobs:
   refresh-the-dashboard:
@@ -14,7 +14,7 @@ jobs:
       actions: write
       pages: write
     container: 
-      image: mgaloto/bs4dashdolar:07
+      image: mgaloto/bs4dashdolar:01
     steps:
     - name: checkout_repo
       uses: actions/checkout@v3

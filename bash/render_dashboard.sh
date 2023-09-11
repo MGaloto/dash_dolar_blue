@@ -17,7 +17,9 @@ echo "${LGREEN}----------Ok Rscript---------${LGREEN}"
 # Fix github issue
 git config --global --add safe.directory /__w/dash_dolar_blue/dash_dolar_blue
 
-if [[ "$(git status --porcelain)" != "" ]]; then
+changes=$(git status --porcelain)
+
+if [[ "$changes" != "" ]]; then
     git config --global user.name $1
     git config --global user.email $2
     git add *
@@ -25,6 +27,8 @@ if [[ "$(git status --porcelain)" != "" ]]; then
     git pull
     git push
     echo "${LGREEN}Se registraron cambios en el repositorio.${LGREEN}"
+    echo "${LGREEN}Archivos modificados:${LGREEN}"
+    echo "$changes"
 else
     echo "OK Auto update dashboard. ${LRED}No${LRED} se registraron cambios en el ${LGREEN}repositorio${LGREEN}."
 fi

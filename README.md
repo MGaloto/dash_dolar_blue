@@ -3,5 +3,5 @@
 # dash_dolar_blue
 Dashboard del Dolar Paralelo Argentina
 
-
-Trabajo Final ----> https://rpubs.com/MGaloto/dolarparalelo
+Trabajo Final Shiny ----> https://maxi-galo.shinyapps.io/dolartrends/
+Trabajo Final Rpubs ----> https://rpubs.com/MGaloto/dolarparalelo

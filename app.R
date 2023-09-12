@@ -21,12 +21,6 @@ today = format(
   format = "%Y-%m-%d"
 )
 
-today_with_hs = format(
-  with_tz(
-    Sys.time() ,
-    tzone = "America/Argentina/Buenos_Aires"), 
-  format = "%Y-%m-%d %H:%M"
-)
 
 
 edit_dolar_historico = function(df){
@@ -106,7 +100,7 @@ get_dolar_interanual_input = function(df, date_min, date_max){
 
 
 
-get_dolar_var = function(df, dias){
+get_dolar_var = function(df, dias=1){
   return(
     round((df$Promedio[df$Fecha==max(df$Fecha)] - 
              df$Promedio[nrow(df) - dias]) /
@@ -241,7 +235,7 @@ ui <- dashboardPage(
         tabName = "dashboard",
         h3("Precios Dolar Economia Argentina"),
         p("Dashboard sobre el precio del dolar en ", 
-          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",today_with_hs)),
+          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",today)),
         fluidRow(
           bs4ValueBoxOutput("valuebox_1",width = 4),
           bs4ValueBoxOutput("valuebox_2",width = 4),
@@ -258,14 +252,7 @@ ui <- dashboardPage(
               width = 12,
               tabPanel(
                 title = "Time Serie",
-                numericInput(
-                  inputId = "variaciondias",
-                  label = HTML("Dias de Variacion %<br><br>",
-                               "Seleccionar la cantidad de dias para atras para ver la variacion % de los 3 Tipos de Cambio."),
-                  min = 1,
-                  max = 5,
-                  value = 5
-                ),
+
                 dateRangeInput(
                   "daterange3", 
                   label = HTML(
@@ -357,6 +344,7 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "datos",
+        p("Datos de los 3 Tipos de Cambio."),
         fluidRow(
           column(12,
                  tabBox(
@@ -479,9 +467,9 @@ server <- function(input, output,session) {
   observeEvent(input$variaciondias, {
     
     rv$dias_variacion = as.numeric(input$variaciondias)
-    rv$var_dolar_blue = get_dolar_var(dolar, rv$dias_variacion)
-    rv$var_dolar_oficial = get_dolar_var(dolaroficial, rv$dias_variacion)
-    rv$var_dolar_mep = get_dolar_var(dolarmep, rv$dias_variacion)
+    rv$var_dolar_blue = get_dolar_var(dolar)
+    rv$var_dolar_oficial = get_dolar_var(dolaroficial)
+    rv$var_dolar_mep = get_dolar_var(dolarmep)
     
   }, ignoreNULL = FALSE)
   
@@ -820,7 +808,7 @@ server <- function(input, output,session) {
       icon = icon("coins"),
       color = "teal",
       width = 3,
-      footer = div(paste0("Variacion % Ultimos ", as.character(rv$dias_variacion) ," dias"))
+      footer = div(paste0("Variacion % respecto al dia anterior."))
     )
   })
   

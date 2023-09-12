@@ -120,7 +120,7 @@ get_tibble = function(dolarhoy, data, today){
       Promedio = dolarhoy["promedio"][[1]],
       variacion = round(
         ((dolarhoy["promedio"][[1]]-data$Promedio[nrow(data)] ) / data$Promedio[nrow(data)]),2
-      )
+      ) * 100
     )
   )
 }

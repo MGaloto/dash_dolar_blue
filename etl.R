@@ -112,6 +112,7 @@ edit_dolar = function(df){
 
 
 get_tibble = function(dolarhoy, data, today){
+  today_before = as.Date(today)-1
   return(
     tibble(
       Fecha = as.Date(today),
@@ -119,7 +120,7 @@ get_tibble = function(dolarhoy, data, today){
       Venta = dolarhoy["venta"][[1]],
       Promedio = dolarhoy["promedio"][[1]],
       variacion = round(
-        ((dolarhoy["promedio"][[1]]-data$Promedio[nrow(data)] ) / data$Promedio[nrow(data)]),2
+        ((dolarhoy["promedio"][[1]]-data$Promedio[data$Fecha==today_before] ) / data$Promedio[data$Fecha==today_before]),2
       ) * 100
     )
   )

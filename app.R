@@ -34,7 +34,6 @@ edit_dolar_historico = function(df){
     ))
 }
 
-packageVersion("cli")
 
 get_date_interanual = function(df){
   fecha_max = max(df$Fecha)
@@ -769,7 +768,7 @@ server <- function(input, output,session) {
       icon = icon("dollar-sign"),
       color = "teal",
       width = 3,
-      footer = div(paste0("Precios al ",today))
+      footer = div(paste0("Precios al ",max_date))
     )
   })
   

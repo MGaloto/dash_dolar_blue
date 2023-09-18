@@ -23,6 +23,9 @@ last_update <- paste("Last update: ", today(), sep = "")
 
 
 
+
+
+
 get_dolarhoy = function(url){
   webpage <- read_html(url)
   compra_node <- webpage %>%
@@ -130,7 +133,9 @@ get_tibble = function(dolarhoy, data, today){
 
 
 if (today>=max(data$Fecha)){
-  if (today == max(data$Fecha)+1 | today == max(data$Fecha)){
+  if (today == max(data$Fecha)+1 |
+      today == max(data$Fecha) |
+      weekdays(as.Date(today)-1) == "domingo"){
     dolarhoy_blue= get_dolarhoy(URL_BLUE)
     dolar = unique(bind_rows(
       data %>% filter(Fecha < today),
@@ -150,7 +155,8 @@ if (today>=max(data$Fecha)){
 
 
 
-if (today>=max(datamep$Fecha)){
+if (today>=max(datamep$Fecha)  |
+    weekdays(as.Date(today)-1) == "domingo")){
   dolarhoy_mep= get_dolarhoy(URL_MEP)
   dolarmep = unique(bind_rows(
     datamep %>% filter(Fecha < today),
@@ -166,7 +172,8 @@ if (today>=max(datamep$Fecha)){
 
 
 
-if (today>=max(dataoficial$Fecha)){
+if (today>=max(dataoficial$Fecha) |
+    weekdays(as.Date(today)-1) == "domingo"){
   dolarhoy_oficial= get_dolarhoy(URL_OFICIAL)
   dolaroficial = unique(bind_rows(
     dataoficial %>% filter(Fecha < today),

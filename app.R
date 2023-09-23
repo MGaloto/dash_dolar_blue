@@ -350,7 +350,7 @@ ui <- dashboardPage(
         tabName = "dashboard",
         h3("Precios Dolar Economia Argentina"),
         p("Dashboard sobre el precio del dolar en ", 
-          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",to)),
+          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",to, weekdays(today))),
         fluidRow(
           bs4ValueBoxOutput("valuebox_1",width = 4),
           bs4ValueBoxOutput("valuebox_2",width = 4),
@@ -405,7 +405,7 @@ ui <- dashboardPage(
           column(
             width = 12,
             box(
-              title = "Variacion Dolar Blue",
+              title = "Variacion Dolar",
               width = 12,
               status = "teal",
               icon = icon("chart-line"),
@@ -808,7 +808,7 @@ server <- function(input, output,session) {
         borderWidth = 5
       ) %>% 
       hc_title(
-        text = paste0('Dolar Blue Variacion Argentina'),
+        text = paste0('Dolar ',input$tc,' Variacion Argentina'),
         style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
   })
   

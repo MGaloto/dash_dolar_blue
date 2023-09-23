@@ -11,101 +11,239 @@ library(lubridate)
 library(reactable)
 library(htmltools)
 library(openxlsx)
+library(httr)
+library(rvest)
 
 
 
-today = format(
-  with_tz(
-    Sys.time() ,
-    tzone = "America/Argentina/Buenos_Aires"), 
+today = as.Date(format(
+  with_tz(Sys.time() , 
+          tzone = "America/Argentina/Buenos_Aires"), 
   format = "%Y-%m-%d"
-)
+))
+
+
+current_hour <- hour(with_tz(Sys.time(), tzone = "America/Argentina/Buenos_Aires"))
 
 
 
-edit_dolar_historico = function(df){
+get_day_to = function(today, current_hour){
+  day_of_week <- weekdays(today)
+  if (day_of_week == "sábado") {
+    today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+  } else if (day_of_week == "domingo") {
+    today <- format(as.Date(today) - days(2), format = "%Y-%m-%d")
+  }
+  
+  if (current_hour >= 0 && current_hour < 10) {
+    today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+  }
+
+  return(as.Date(today))
+}
+
+
+
+
+to = get_day_to(today, current_hour)
+from = to - years(1)
+from_historic = from
+
+
+
+url_ccl = "https://mercados.ambito.com//dolarrava/cl/historico-general/"
+url_ccl_diario <- "https://mercados.ambito.com//dolarrava/cl/variacion"
+url_informal = "https://mercados.ambito.com/dolar/informal/historico-general/"
+url_informal_diario <- "https://mercados.ambito.com/dolar/informal/variacion"
+url_mep = "https://mercados.ambito.com//dolarrava/mep/grafico/"
+url_mep_diario <- "https://mercados.ambito.com///dolarrava/mep/variacion"
+url_oficial = "https://mercados.ambito.com//dolar/oficial/historico-general/"
+url_oficial_diario <- "https://mercados.ambito.com//dolar/oficial/variacion"
+
+
+
+get_df_fill = function(df, from_historic){
+  df = df %>% filter(Fecha >= from_historic)
+  columns = c("mep","ccl","informal","oficial")
+  for (col in columns){
+    posiciones_na <- which(is.na(df[, col]))
+    for (pos in posiciones_na){
+      numero = pos
+      while (TRUE) {
+        numero <- numero + 1
+        valor_anterior = df[[col]][numero]
+        if (!is.na(valor_anterior)) {
+          df[[col]][pos] = valor_anterior
+          break
+        } 
+      }
+    }
+  }
+  return(df %>% distinct())
+}
+
+
+
+
+
+get_json <- function(url) {
+  tryCatch({
+    response <- httr::GET(url, headers = c("sec-ch-ua" = "^Chromium^;v=^116^, ^Not"))
+    status <- httr::http_status(response)$reason 
+    if (status == "OK") {
+      response_content <- httr::content(response, "text")
+      tryCatch({
+        response_json <- jsonlite::fromJSON(response_content, simplifyVector = FALSE)
+        return(response_json)
+      }, error = function(e) {
+        cat("Error al analizar el JSON:", e$message, "\n")
+        return(NULL)
+      })
+    } else {
+      cat("La solicitud no se pudo completar. Código de estado:", status, "\n")
+      return(NULL)
+    }
+  }, error = function(e) {
+    cat("Error en la solicitud HTTP:", e$message, "\n")
+    return(NULL)
+  })
+}
+
+
+ultima_actualizacion = function(ccl_day, oficial_day, informal_day, mep_day) {
+  act= rbind(ccl_day, oficial_day, informal_day, mep_day) %>% select(Actualizacion) %>% arrange(Actualizacion)
+  valor = act[nrow(act),]$Actualizacion
+  return(valor)
+}
+
+
+
+format_df = function(df){
+  if ("Promedio" %in% colnames(df)) {
+    return(df %>%
+             arrange(Fecha) %>% 
+             mutate(Promedio = round(as.numeric(gsub(",", ".", Promedio)),2)) %>% 
+             mutate(variacion = round((as.numeric(Promedio) - lag(as.numeric(Promedio), n = 1)) / lag(as.numeric(Promedio), n = 1),4)*100) %>% 
+             select(Fecha, Promedio, variacion))
+  }  else if ("valor_cierre_ant" %in% colnames(df)) {
+    return(
+      df %>% mutate(
+        Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+        Compra = round(as.numeric(gsub(",", ".", compra)),2),
+        Venta = round(as.numeric(gsub(",", ".", venta)),2),
+        Promedio = ((Compra + Venta) / 2),
+        variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+        select(Fecha, Compra, Venta, Promedio, variacion)
+    )
+  } else {
+    return(
+      df %>% arrange(Fecha) %>% mutate(
+        Fecha = as.Date(Fecha, format = "%d/%m/%Y"),
+        Compra = round(as.numeric(gsub(",", ".", Compra)),2),
+        Venta = round(as.numeric(gsub(",", ".", Venta)),2),
+        Promedio = ((Compra + Venta) / 2),
+        variacion = round((Promedio - lag(Promedio, n = 1)) / lag(Promedio, n = 1),4)*100) %>%
+        select(Fecha, Compra, Venta, Promedio, variacion)
+    ) 
+  }
+}
+
+
+format_df_diario = function(df){
   return(
     df %>% mutate(
-      Fecha = as.Date(Fecha, format = "%d/%m/%Y"),
-      Compra = round(as.numeric(Compra),2),
-      Venta = round(as.numeric(Venta),2),
-      Promedio = round(as.numeric(Promedio),2),
-      variacion = round(as.numeric(variacion),2)
-    ))
-}
-
-
-get_date_interanual = function(df){
-  fecha_max = max(df$Fecha)
-  fecha_before = as.Date(fecha_max) - years(1)
-  while (TRUE) {
-    dolar_before = df$Promedio[df$Fecha == fecha_before]
-    if (length(dolar_before) > 0) {
-      break  
-    } else {
-      fecha_before = fecha_before - 1
-    }
-  }
-  return(as.Date(fecha_before))
-}
-
-df = edit_dolar_historico(read_excel('data/dolar.xlsx') %>% 
-                            select(Fecha,Compra,Venta,Promedio,variacion)) %>% arrange(Fecha)
-max_date = max(df$Fecha)
-min_history_date = min(df$Fecha)
-min_date = get_date_interanual(df)
-
-
-
-get_dolar_interanual = function(df){
-  fecha_max = max(df$Fecha)
-  fecha_before = as.Date(fecha_max) - years(1)
-  while (TRUE) {
-    dolar_before = df$Promedio[df$Fecha == fecha_before]
-    if (length(dolar_before) > 0) {
-      break  
-    } else {
-      fecha_before = fecha_before - 1
-    }
-  }
-  dolar_actual = df$Promedio[nrow(df)]
-  interanual_rate = round(((dolar_actual-dolar_before)/dolar_before)*100,2)
-  return(interanual_rate)
-}
-
-
-get_dolar_interanual_input = function(df, date_min, date_max){
-  fecha_max = as.Date(date_max)
-  fecha_before = as.Date(date_min)
-  while (TRUE) {
-    dolar_before = df$Promedio[df$Fecha == fecha_before]
-    if (length(dolar_before) > 0) {
-      break  
-    } else {
-      fecha_before = fecha_before - 1
-    }
-  }
-  while (TRUE) {
-    dolar_actual = df$Promedio[df$Fecha == fecha_max]
-    if (length(dolar_actual) > 0) {
-      break  
-    } else {
-      fecha_max = fecha_max - 1
-    }
-  }
-  interanual_rate = round(((dolar_actual-dolar_before)/dolar_before)*100,2)
-  return(interanual_rate)
-}
-
-
-
-get_dolar_var = function(df, dias=1){
-  return(
-    round((df$Promedio[df$Fecha==max(df$Fecha)] - 
-             df$Promedio[nrow(df) - dias]) /
-            df$Promedio[nrow(df) - dias],4)*100
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Actualizacion = strsplit(fecha, " - ")[[1]][2],
+      Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Actualizacion, Promedio, variacion)
   )
 }
+
+
+
+
+get_dolar = function(url, from, to){
+  url_historico <- paste0(url, from,"/",to)
+  response_json = get_json(url_historico)
+  data_frame <- response_json %>%
+    purrr::map_dfr(~setNames(as.list(.x), c("Fecha", "Compra", "Venta")))
+  mi_tibble <- as_tibble(data_frame)[-1, ]
+  mi_tibble <- mi_tibble %>% 
+    mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
+    arrange(Fecha) %>%
+    group_by(Fecha) %>%
+    filter(Venta == max(Venta)) %>%
+    ungroup() %>% 
+    distinct()
+  return(format_df(mi_tibble))
+}
+
+
+
+
+
+get_mep = function(url, from, to){
+  url_historico <- paste0(url, from,"/",to)
+  response_json = get_json(url_historico)
+  data_frame <- data.frame(matrix(unlist(response_json), ncol = 2, byrow = TRUE), stringsAsFactors = FALSE)
+  colnames(data_frame) <- c("Fecha", "Promedio")
+  mi_tibble <- as_tibble(data_frame)[-1, ]
+  mi_tibble <- mi_tibble %>% 
+    mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
+    arrange(Fecha) %>%
+    group_by(Fecha) %>%
+    filter(Promedio == max(Promedio)) %>%
+    ungroup() %>% 
+    distinct()
+  return(format_df(mi_tibble))
+}
+
+
+
+
+get_ccl = function(url, from, to){
+  url_historico <- paste0(url, from,"/",to)
+  response_json = get_json(url_historico)
+  data_frame <- data.frame(matrix(unlist(response_json), ncol = 2, byrow = TRUE), stringsAsFactors = FALSE)
+  colnames(data_frame) <- c("Fecha", "Promedio")
+  mi_tibble <- na.omit(as_tibble(data_frame)[-1, ])
+  mi_tibble <- mi_tibble %>% 
+    mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
+    arrange(Fecha) %>%
+    group_by(Fecha) %>%
+    filter(Promedio == max(Promedio)) %>%
+    ungroup() %>% 
+    distinct()
+  return(format_df(mi_tibble))
+}
+
+
+acumulado_df = function(df){
+  columns = c("mep","ccl","informal","oficial")
+  max_year_filter = year(max(df$Fecha))
+  data_filter = df %>% filter(year(Fecha)==max_year_filter) %>% select(Fecha) 
+  min_date_filter = min(data_filter$Fecha)
+  max_date_filter = max(data_filter$Fecha)
+  names = c()
+  values = c()
+  for (i in 1:length(columns)){
+    actual_value = df[df[["Fecha"]] == max_date_filter, columns[i]]
+    before_value = df[df[["Fecha"]] == min_date_filter, columns[i]]
+    interanual_rate = round((actual_value - before_value) / before_value, 4) * 100
+    
+    names[i] <- columns[i]
+    values[i] <- interanual_rate
+  }
+  return(na.omit(tibble(tc = names, tasa = values)))
+}
+
+
+
+
+
 
 get_icon_arrow = function(df){
   actual_value = round(df$brecha[nrow(df)],2)
@@ -136,16 +274,6 @@ get_table = function(df){
           align = "center",
           minWidth = 120
         ),
-        Compra = colDef(
-          name = "Compra",
-          align = "center",
-          minWidth = 60
-        ),
-        Venta = colDef(
-          name = "Venta",
-          align = "left",
-          minWidth = 60
-        ),
         Promedio = colDef(
           name = "Promedio",
           align = "left",
@@ -166,18 +294,6 @@ get_table = function(df){
 
 
 
-get_date = function(df, date){
-  fecha = as.Date(date)
-  while (TRUE) {
-    dolar = df$Promedio[df$Fecha == fecha]
-    if (length(dolar) > 0) {
-      break  
-    } else {
-      fecha = fecha - 1
-    }
-  }
-  return(as.Date(fecha))
-}
 
 
 ui <- dashboardPage(
@@ -234,7 +350,7 @@ ui <- dashboardPage(
         tabName = "dashboard",
         h3("Precios Dolar Economia Argentina"),
         p("Dashboard sobre el precio del dolar en ", 
-          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",today)),
+          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",to)),
         fluidRow(
           bs4ValueBoxOutput("valuebox_1",width = 4),
           bs4ValueBoxOutput("valuebox_2",width = 4),
@@ -242,34 +358,7 @@ ui <- dashboardPage(
         ),
         fluidRow(
           column(
-            width = 4,
-            box(
-              title = "Inputs",
-              status = "teal",
-              icon = icon("keyboard"),
-              solidHeader = TRUE,
-              width = 12,
-              tabPanel(
-                title = "Time Serie",
-
-                dateRangeInput(
-                  "daterange3", 
-                  label = HTML(
-                    "Rango de Fechas: <br><br>",
-                    "Seleccionar un rango de fechas para ver la variacion del Tipo de Cambio Blue, la Serie Temporal del precio y de la variacion respecto al dia anterior."),
-                  start  = min_date,
-                  end    = max_date,
-                  min    = min_history_date,
-                  max    = max_date,
-                  format = "dd/mm/yyyy",
-                  separator = " - ",
-                  language = "es"
-                )
-              )
-            )
-          ),
-          column(
-            width = 8,
+            width = 7,
             box(
               title = "Serie Temporal",
               width = 12,
@@ -278,8 +367,36 @@ ui <- dashboardPage(
               solidHeader = TRUE,
               tabPanel(
                 title = "Var",
+                dateRangeInput(
+                  "daterange", 
+                  label = "Rango de Fechas",
+                  start  = from,
+                  end    = to,
+                  min    = from,
+                  max    = to,
+                  format = "dd/mm/yyyy",
+                  separator = " - ",
+                  language = "es"
+                ),
                 withSpinner(
                   highchartOutput("timeserie"),
+                  type = 1
+                )
+              )
+            )
+          ),
+          column(
+            width = 5,
+            box(
+              title = "Bar Plot",
+              status = "teal",
+              icon = icon("keyboard"),
+              solidHeader = TRUE,
+              width = 12,
+              tabPanel(
+                title = "Time Serie",
+                withSpinner(
+                  highchartOutput("barplot"),
                   type = 1
                 )
               )
@@ -295,6 +412,9 @@ ui <- dashboardPage(
               solidHeader = TRUE,
               tabPanel(
                 title = "Variacion Dolar Blue",
+                radioButtons("tc", "Seleccionar el Tipo de Cambio",
+                             c("Informal" , "Ccl", "Mep" , "Oficial"), 
+                             inline = T),
                 withSpinner(
                   highchartOutput("varplot"),
                   type = 1
@@ -313,7 +433,7 @@ ui <- dashboardPage(
         fluidRow(
           bs4ValueBoxOutput("valuebox_brechas_1",width = 4),
           bs4ValueBoxOutput("valuebox_brechas_2",width = 4),
-          bs4ValueBoxOutput("valuebox_brechas_3",width = 4)
+          bs4ValueBoxOutput("valuebox_brechas_3",width = 4),
         ),
         fluidRow(
           column(12,
@@ -336,6 +456,11 @@ ui <- dashboardPage(
                           title = "Blue/Oficial",
                           withSpinner(
                             highchartOutput("barplot_bluevsoficial"))
+                        ),
+                        tabPanel(
+                          title = "CCL/Oficial",
+                          withSpinner(
+                            highchartOutput("barplot_cclvsoficial"))
                         )
                  )
           )
@@ -343,7 +468,7 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "datos",
-        p("Datos de los 3 Tipos de Cambio."),
+        p("Datos de los 4 Tipos de Cambio."),
         fluidRow(
           column(12,
                  tabBox(
@@ -358,12 +483,14 @@ ui <- dashboardPage(
                    ),
                    tabPanel(
                      title = "Dolar Mep",
-                     
                      reactable::reactableOutput("table_mep_output")
                    ),
                    tabPanel(
+                     title = "Dolar CCL",
+                     reactable::reactableOutput("table_ccl_output")
+                   ),
+                   tabPanel(
                      title = "Dolar Oficial",
-                     
                      reactable::reactableOutput("table_oficial_output")
                    )
                  )
@@ -408,94 +535,230 @@ server <- function(input, output,session) {
   
   
   
-  dolar = edit_dolar_historico(
-    read_excel('data/dolar.xlsx') %>% 
-      arrange(Fecha) %>% 
-      select(Fecha,Compra,Venta,Promedio,variacion))
+  informal = reactiveVal(rbind(
+    get_dolar(url_informal, from, to) %>% filter(Fecha != to), 
+    format_df(as_tibble(get_json(url_informal_diario)))
+    ) %>% arrange(Fecha) %>% distinct()
+  )
   
-  dolarmep= edit_dolar_historico(
-    read_excel('data/dolarmep.xlsx') %>% 
-      arrange(Fecha) %>% 
-      select(Fecha,Compra,Venta,Promedio,variacion))
-  
-  dolaroficial=edit_dolar_historico(
-    read_excel('data/dolaroficial.xlsx') %>% 
-      arrange(Fecha) %>% 
-      select(Fecha,Compra,Venta,Promedio,variacion))
-  
-  dolarmepcierre = dolarmep$Promedio[nrow(dolarmep)]
-  dolaroficialcierre = dolaroficial$Promedio[nrow(dolaroficial)]
-  dolarbluecierre = dolar$Promedio[nrow(dolar)]
+  informal_day = reactive(format_df_diario(
+    as_tibble(
+      get_json(url_informal_diario)
+      )
+    )
+  )
   
   
-  mepvsoficial = merge(
-    na.omit(dolarmep %>% mutate(prommep = Promedio) %>% select(Fecha,prommep)), 
-    na.omit(dolaroficial %>% mutate(promoficial = Promedio) %>% select(Fecha,promoficial)), 
+
+  mep = reactiveVal(rbind(
+    get_mep(url_mep, from, to) %>% filter(Fecha != to), 
+    format_df(as_tibble(get_json(url_mep_diario))) %>% select(Fecha, Promedio, variacion)
+    ) %>% arrange(Fecha) %>% distinct()
+  )
+  
+  mep_day = reactive(format_df_diario(
+    as_tibble(
+      get_json(url_mep_diario)
+      )
+    )
+  )
+  
+  
+  
+  ccl = reactiveVal(rbind(
+    get_ccl(url_ccl, from, to) %>% filter(Fecha != to), 
+    format_df(as_tibble(get_json(url_ccl_diario))) %>% select(Fecha, Promedio, variacion)
+    ) %>% arrange(Fecha) %>% distinct()
+  )
+  
+  ccl_day = reactive(format_df_diario(
+    as_tibble(
+      get_json(url_ccl_diario)
+      )
+    )
+  )
+
+  
+  
+  oficial = reactiveVal(rbind(
+    get_dolar(url_oficial, from, to) %>% filter(Fecha != to), 
+    format_df(as_tibble(get_json(url_oficial_diario)))
+    ) %>% arrange(Fecha) %>% distinct()
+  )
+  
+  oficial_day = reactive(format_df_diario(
+    as_tibble(
+      get_json(url_oficial_diario)
+      )
+    )
+  )
+
+
+  
+  ultima_hora = reactive(ultima_actualizacion(
+    ccl_day(), oficial_day(), informal_day(), mep_day()
+    )
+  )
+  
+  
+  
+  
+  
+  dolar <- reactive(merge(
+    merge(
+      merge(
+        informal() %>% select(Fecha, Promedio) %>% rename(informal = Promedio), 
+        ccl() %>% select(Fecha, Promedio) %>% rename(ccl = Promedio), by = "Fecha", all = TRUE), 
+      mep() %>% select(Fecha, Promedio) %>% rename(mep = Promedio), by = "Fecha", all = TRUE), 
+    oficial() %>% select(Fecha, Promedio) %>% rename(oficial = Promedio), by = "Fecha", all = TRUE))
+  
+  
+  
+  dolarmepcierre = reactive(mep()$Promedio[nrow(mep())])
+  dolaroficialcierre = reactive(oficial()$Promedio[nrow(oficial())])
+  dolarbluecierre = reactive(informal()$Promedio[nrow(informal())])
+  dolarcclcierre = reactive(ccl()$Promedio[nrow(ccl())])
+  
+  
+  mepvsoficial = reactive(
+    merge(
+    na.omit(mep() %>% mutate(prommep = Promedio) %>% select(Fecha,prommep)), 
+    na.omit(oficial() %>% mutate(promoficial = Promedio) %>% select(Fecha,promoficial)), 
     by = "Fecha", 
     all = FALSE
   ) %>% mutate(
     brecha = round((prommep-promoficial) / promoficial,2)*100
   ) %>% select(Fecha, brecha) %>% arrange(Fecha)
+  )
   
-  bluevsoficial = merge(
-    na.omit(dolar %>% mutate(promblue = Promedio) %>% select(Fecha,promblue)), 
-    na.omit(dolaroficial %>% mutate(promoficial = Promedio) %>% select(Fecha,promoficial)), 
+  bluevsoficial = reactive(
+    merge(
+    na.omit(informal() %>% mutate(promblue = Promedio) %>% select(Fecha,promblue)), 
+    na.omit(oficial() %>% mutate(promoficial = Promedio) %>% select(Fecha,promoficial)), 
     by = "Fecha", 
     all = FALSE
   ) %>% mutate(
     brecha = round((promblue-promoficial) / promoficial,2)*100
   ) %>% select(Fecha, brecha) %>% arrange(Fecha)
+  )
   
-  bluevsmep = merge(
-    na.omit(dolar %>% mutate(promblue = Promedio) %>% select(Fecha,promblue)), 
-    na.omit(dolarmep %>% mutate(prommep = Promedio) %>% select(Fecha,prommep)), 
+  bluevsmep = reactive(
+    merge(
+    na.omit(informal() %>% mutate(promblue = Promedio) %>% select(Fecha,promblue)), 
+    na.omit(mep() %>% mutate(prommep = Promedio) %>% select(Fecha,prommep)), 
     by = "Fecha", 
     all = FALSE
   ) %>% mutate(
     brecha = round((promblue-prommep) / prommep,2)*100
   ) %>% select(Fecha, brecha) %>% arrange(Fecha)
+  )
   
-  info_mepvsoficial = get_icon_arrow(mepvsoficial)
-  info_bluevsoficial = get_icon_arrow(bluevsoficial)
-  info_bluevsmep = get_icon_arrow(bluevsmep)
+  cclvsoficial = reactive(
+    merge(
+    na.omit(ccl() %>% mutate(promccl = Promedio) %>% select(Fecha,promccl)), 
+    na.omit(oficial() %>% mutate(promoficial = Promedio) %>% select(Fecha,promoficial)), 
+    by = "Fecha", 
+    all = FALSE
+  ) %>% mutate(
+    brecha = round((promccl-promoficial) / promoficial,2)*100
+  ) %>% select(Fecha, brecha) %>% arrange(Fecha)
+  )
   
   
-  rv <- reactiveValues()
+  
+  info_mepvsoficial = reactive(get_icon_arrow(mepvsoficial()))
+  info_bluevsoficial = reactive(get_icon_arrow(bluevsoficial()))
+  info_bluevsmep = reactive(get_icon_arrow(bluevsmep()))
+  info_cclvsoficial = reactive(get_icon_arrow(cclvsoficial()))
   
   
-  observeEvent(input$variaciondias, {
-    
-    rv$dias_variacion = as.numeric(input$variaciondias)
-    rv$var_dolar_blue = get_dolar_var(dolar)
-    rv$var_dolar_oficial = get_dolar_var(dolaroficial)
-    rv$var_dolar_mep = get_dolar_var(dolarmep)
-    
-  }, ignoreNULL = FALSE)
+  dolar_merge = reactive(get_df_fill(
+    dolar(), from_historic)
+  )
+  
+  df_acumulado_anual = reactive(acumulado_df(dolar_merge()))
+  
+  
+  
   
   output$table_blue_output <- reactable::renderReactable({
-    get_table(dolar)
-    
+    get_table(informal())
   })
   output$table_mep_output <- reactable::renderReactable({
-    get_table(dolarmep)
-    
+    get_table(mep())
   })
   output$table_oficial_output <- reactable::renderReactable({
-    get_table(dolaroficial)
+    get_table(oficial())
+  })
+  output$table_ccl_output <- reactable::renderReactable({
+    get_table(ccl())
+  })
+  
+  
+  output$barplot <- renderHighchart({
+    df_with_colors <- df_acumulado_anual() %>%
+      mutate(colores = ifelse(tc == "mep", "#1b7bc4",
+                              ifelse(tc == "ccl", "#2dcc72",
+                                     ifelse(tc == "informal", "#5dadbd",
+                                            ifelse(tc == "oficial", "#cfc5b7", NA))))) %>% 
+      arrange(desc(tasa))
     
+    
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_xAxis(categories = df_with_colors$tc) %>%
+      hc_add_series(data = df_with_colors$tasa, name = "Precio", colorByPoint = TRUE, colors = df_with_colors$colores) %>% 
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Porcentaje Acumulado en el Año: % {point.y}") %>%
+      highcharter::hc_legend(enabled = FALSE) %>%
+      highcharter::hc_xAxis(
+        title = list(text = ""),
+        reversed = FALSE,
+        labels = list(
+          style = list(color = "black", fontWeight = "bold")
+        )
+      ) %>%
+      highcharter::hc_yAxis(
+        title = list(text = "%",
+                     style = list(color = "black", fontWeight = "bold")),
+        gridLineWidth = 0,
+        reversed = FALSE,
+        labels = list(
+          style = list(color = "black", fontWeight = "bold")
+        )
+      ) %>%
+      
+      highcharter::hc_caption(
+        text = paste0("Tipos de Cambio"),
+        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
+      highcharter::hc_tooltip(
+        crosshairs = TRUE,
+        backgroundColor = "#F0F0F0",
+        shared = TRUE, 
+        borderWidth = 5
+      ) %>% 
+      hc_title(
+        text = paste0("Variacion % acumulado en " , as.character(year(to))),
+        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
   })
   
   
   
   output$varplot <- renderHighchart({
     
-    date_from = get_date(dolar,as.Date(input$daterange3[1]))
-    date_to = get_date(dolar,as.Date(input$daterange3[2]))
+    if (input$tc == "Informal"){
+      df = informal()
+    } else if (input$tc == "Mep") {
+      df = mep()
+    } else if (input$tc == "Ccl") {
+      df = ccl()
+    } else {
+      df = informal()
+    }
     
     highcharter::hchart(
-      dolar %>% 
-        filter(Fecha >= date_from, 
-               Fecha <= date_to) %>% 
+      df %>% 
+        filter(Fecha >= from, 
+               Fecha <= to) %>% 
         select(Fecha, variacion), 
       type = "line",  
       highcharter::hcaes(x = "Fecha", y = "variacion"),
@@ -504,7 +767,6 @@ server <- function(input, output,session) {
       id = "trend",
       showInLegend = TRUE) %>%
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Variacion: {point.y}%") %>%
-      
       highcharter::hc_plotOptions(
         line = list(
           color = "blue",
@@ -536,9 +798,8 @@ server <- function(input, output,session) {
           style = list(color = "black", fontWeight = "bold")
         )
       ) %>%
-      
       highcharter::hc_caption(
-        text = paste0("Variacion del Dolar Blue"),
+        text = paste0("Variacion del Dolar ", input$tc),
         style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
       highcharter::hc_tooltip(
         crosshairs = TRUE,
@@ -554,42 +815,38 @@ server <- function(input, output,session) {
   
   
   
+  
   output$timeserie <- renderHighchart({
     
-    highcharter::hchart(
-      dolar %>% 
-        filter(Fecha >= as.Date(input$daterange3[1]), Fecha <= as.Date(input$daterange3[2])) %>% 
-        select(Fecha, Promedio), 
-      type = "line",  
-      highcharter::hcaes(x = "Fecha", y = "Promedio"),
-      color = "#007bff",
-      name = "ver", 
-      id = "trend",
-      showInLegend = TRUE) %>%
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Dolar Blue: ${point.y}") %>%
-      
-      highcharter::hc_plotOptions(
-        line = list(
-          color = "blue",
-          marker = list(
-            fillColor = "white",
-            lineWidth = 2,
-            radius=1,
-            lineColor = NULL
-          )
-        )
-      ) %>%
-      highcharter::hc_legend(enabled = FALSE) %>%
-      highcharter::hc_xAxis(
-        title = list(text = ""),
-        gridLineWidth = 0,
-        dateTimeLabelFormats = list(day = '%Y'),
-        type = "datetime",
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
+    dolar_merge_filter = dolar_merge() %>% filter(Fecha >= input$daterange[1], Fecha <= input$daterange[2])
+    
+    highchart() %>%
+      hc_xAxis(categories = dolar_merge_filter$Fecha) %>%
+      hc_add_series(dolar_merge_filter$ccl, 
+                    name = "CCL", 
+                    type = "line",
+                    color = "#2dcc72",
+                    tooltip = list(valueDecimals = 2)) %>%
+      hc_add_series(dolar_merge_filter$mep, 
+                    name = "Mep",
+                    type = "line",
+                    color = "#1b7bc4",
+                    tooltip = list(valueDecimals = 2)) %>%
+      hc_add_series(dolar_merge_filter$informal,
+                    name = 'Informal', 
+                    type = "line",
+                    color = "#5dadbd",
+                    tooltip = list(valueDecimals = 2)) %>%
+      hc_add_series(dolar_merge_filter$oficial, 
+                    name = "Oficial",
+                    type = "line",
+                    color = "#cfc5b7",
+                    tooltip = list(valueDecimals = 2)) %>%
+      hc_title(text = "Gráfico de Líneas con Tres Series de Tiempo") %>%
+      hc_yAxis(title = list(text = "Valor")) %>%
+      hc_tooltip(shared = T) %>%
+      hc_plotOptions(series = list(dataLabels = list(enabled = F))) %>%
+      highcharter::hc_legend(enabled = T) %>%
       highcharter::hc_yAxis(
         title = list(text = "Precio",
                      style = list(color = "black", fontWeight = "bold")),
@@ -599,20 +856,16 @@ server <- function(input, output,session) {
           style = list(color = "black", fontWeight = "bold")
         )
       ) %>%
-      
       highcharter::hc_caption(
-        text = paste0("Serie Temporal del Dolar Paralelo."),
+        text = paste0("Serie Temporal de distintos tipos de cambio en Argentina."),
         style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
-      highcharter::hc_tooltip(
-        crosshairs = TRUE,
-        backgroundColor = "#F0F0F0",
-        shared = TRUE, 
-        borderWidth = 5
-      ) %>% 
       hc_title(
-        text = paste0('Dolar Paralelo Argentina'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+        text = paste0('Dolar Argentina'),
+        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) %>% 
+      hc_add_theme(hc_theme_google())
   })
+  
+  
   
   
   output$barplot_mepvsoficial <- renderHighchart({
@@ -620,10 +873,10 @@ server <- function(input, output,session) {
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Mep vs Oficial") %>%
-      hc_xAxis(categories = mepvsoficial$Fecha) %>%
+      hc_xAxis(categories = mepvsoficial()$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = mepvsoficial$brecha,
+                    data = mepvsoficial()$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -656,9 +909,9 @@ server <- function(input, output,session) {
       hc_title(
         text = paste0('Brecha Cambiaria.'),
         style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
-    
-    
   })
+  
+  
   
   
   output$barplot_bluevsoficial <- renderHighchart({
@@ -666,10 +919,10 @@ server <- function(input, output,session) {
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Blue vs Oficial") %>%
-      hc_xAxis(categories = bluevsoficial$Fecha) %>%
+      hc_xAxis(categories = bluevsoficial()$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = bluevsoficial$brecha,
+                    data = bluevsoficial()$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -689,7 +942,6 @@ server <- function(input, output,session) {
           style = list(color = "black", fontWeight = "bold")
         )
       ) %>%
-      
       highcharter::hc_caption(
         text = paste0("Brecha Blue vs Oficial."),
         style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
@@ -702,9 +954,11 @@ server <- function(input, output,session) {
       hc_title(
         text = paste0('Brecha Cambiaria.'),
         style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
-    
-    
   })
+  
+  
+  
+  
   
   
   output$barplot_bluevsmep <- renderHighchart({
@@ -712,10 +966,10 @@ server <- function(input, output,session) {
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Blue vs Mep") %>%
-      hc_xAxis(categories = bluevsmep$Fecha) %>%
+      hc_xAxis(categories = bluevsmep()$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = bluevsmep$brecha,
+                    data = bluevsmep()$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -748,47 +1002,90 @@ server <- function(input, output,session) {
       hc_title(
         text = paste0('Brecha Cambiaria.'),
         style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
-    
-    
+
   })
   
+  
+  
+  
+  output$barplot_cclvsoficial <- renderHighchart({
+    
+    highchart() %>%
+      hc_chart(type = "column") %>%
+      hc_title(text = "Brecha Dolar CCL vs Oficial") %>%
+      hc_xAxis(categories = cclvsoficial()$Fecha) %>%
+      hc_yAxis(title = list(text = "Brecha")) %>%
+      hc_add_series(name = "brecha", 
+                    data = cclvsoficial()$brecha,
+                    color = "#007bff") %>% 
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
+      highcharter::hc_legend(enabled = FALSE) %>%
+      highcharter::hc_xAxis(
+        title = list(text = ""),
+        reversed = FALSE,
+        labels = list(
+          style = list(color = "black", fontWeight = "bold")
+        )
+      ) %>%
+      highcharter::hc_yAxis(
+        title = list(text = "% Brecha",
+                     style = list(color = "black", fontWeight = "bold")),
+        gridLineWidth = 0,
+        reversed = FALSE,
+        labels = list(
+          style = list(color = "black", fontWeight = "bold")
+        )
+      ) %>%
+      
+      highcharter::hc_caption(
+        text = paste0("Brecha CCL vs Oficial"),
+        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
+      highcharter::hc_tooltip(
+        crosshairs = TRUE,
+        backgroundColor = "#F0F0F0",
+        shared = TRUE, 
+        borderWidth = 5
+      ) %>% 
+      hc_title(
+        text = paste0('Brecha Cambiaria.'),
+        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+    
+  })
   
   
   
   
   
   output$valuebox_1 <- renderbs4ValueBox({
-    
     bs4ValueBox(
       value = "",
       subtitle = HTML(
-        "Blue: $", as.character(dolarbluecierre),"<br>",
-        "Mep: $", as.character(dolarmepcierre),"<br>",
-        "Oficial: $", as.character(dolaroficialcierre)),
+        "Blue: $", as.character(dolarbluecierre()),"<br>",
+        "Mep: $", as.character(dolarmepcierre()),"<br>",
+        "Ccl: $", as.character(dolarcclcierre()),"<br>",
+        "Oficial: $", as.character(dolaroficialcierre())),
       icon = icon("dollar-sign"),
       color = "teal",
       width = 3,
-      footer = div(paste0("Precios al ",max_date))
+      footer = div(paste0("Precios al ", to , " ", ultima_hora()))
     )
   })
   
   output$valuebox_3 <- renderbs4ValueBox({
-    
     bs4ValueBox(
-      value = paste0(
-        as.character(
-          get_dolar_interanual_input(
-            dolar, input$daterange3[1], input$daterange3[2]
-          )
-        ), " %"),
-      subtitle = paste0("Variacion % Dolar Blue"),
+      value = "",
+      subtitle = HTML(
+        "Blue: %", as.character(round(((informal()$Promedio[informal()$Fecha == max(informal()$Fecha)]-informal()$Promedio[informal()$Fecha == min(informal()$Fecha)])/informal()$Promedio[informal()$Fecha == min(informal()$Fecha)])*100,2)),"<br>",
+        "Mep: %", as.character(round(((mep()$Promedio[mep()$Fecha == max(mep()$Fecha)]-mep()$Promedio[mep()$Fecha == min(mep()$Fecha)])/mep()$Promedio[mep()$Fecha == min(mep()$Fecha)])*100,2)),"<br>",
+        "Ccl: %", as.character(round(((ccl()$Promedio[ccl()$Fecha == max(ccl()$Fecha)]-ccl()$Promedio[ccl()$Fecha == min(ccl()$Fecha)])/ccl()$Promedio[ccl()$Fecha == min(ccl()$Fecha)])*100,2)),"<br>",
+        "Oficial: %", as.character(round(((oficial()$Promedio[oficial()$Fecha == max(oficial()$Fecha)]-oficial()$Promedio[oficial()$Fecha == min(oficial()$Fecha)])/oficial()$Promedio[oficial()$Fecha == min(oficial()$Fecha)])*100,2))),
       icon = icon("info"),
       color = "teal",
       width = 3,
       footer = div(
         paste0(
-          "De: ", input$daterange3[1],
-          " a: ",input$daterange3[2]
+          "De: ", from,
+          " a: ", to
         )  
       )
     )
@@ -801,9 +1098,10 @@ server <- function(input, output,session) {
     bs4ValueBox(
       value = "",
       subtitle = HTML(
-        "Blue: ", as.character(rv$var_dolar_blue)," %<br>",
-        "Mep: ", as.character(rv$var_dolar_mep)," %<br>",
-        "Oficial: ", as.character(rv$var_dolar_oficial)," %"),
+        "Blue: ", as.character(informal_day()$variacion)," %<br>",
+        "Mep: ", as.character(mep_day()$variacion)," %<br>",
+        "Ccl: ", as.character(ccl_day()$variacion)," %<br>",
+        "Oficial: ", as.character(oficial_day()$variacion)," %"),
       icon = icon("coins"),
       color = "teal",
       width = 3,
@@ -817,15 +1115,15 @@ server <- function(input, output,session) {
     bs4ValueBox(
       value = paste0(
         as.character(
-          bluevsmep$brecha[nrow(bluevsmep)]
+          bluevsmep()$brecha[nrow(bluevsmep())]
         ), " %"),
       subtitle = paste0("Brecha Blue vs Mep"),
-      icon = icon(info_bluevsmep[2]),
-      color = info_bluevsmep[1],
+      icon = icon(info_bluevsmep()[2]),
+      color = info_bluevsmep()[1],
       width = 3,
       footer = div(
         paste0(
-          max(bluevsmep$Fecha)
+          max(bluevsmep()$Fecha)
         )  
       )
     )
@@ -835,15 +1133,15 @@ server <- function(input, output,session) {
     bs4ValueBox(
       value = paste0(
         as.character(
-          mepvsoficial$brecha[nrow(mepvsoficial)]
+          mepvsoficial()$brecha[nrow(mepvsoficial())]
         ), " %"),
       subtitle = paste0("Brecha Mep vs Oficial"),
-      icon = icon(info_mepvsoficial[2]),
-      color = info_mepvsoficial[1],
+      icon = icon(info_mepvsoficial()[2]),
+      color = info_mepvsoficial()[1],
       width = 3,
       footer = div(
         paste0(
-          max(mepvsoficial$Fecha)
+          max(mepvsoficial()$Fecha)
         )  
       )
     )
@@ -853,19 +1151,27 @@ server <- function(input, output,session) {
     bs4ValueBox(
       value = paste0(
         as.character(
-          bluevsoficial$brecha[nrow(bluevsoficial)]
+          bluevsoficial()$brecha[nrow(bluevsoficial())]
         ), " %"),
       subtitle = paste0("Brecha Blue vs Oficial"),
-      icon = icon(info_bluevsoficial[2]),
-      color = info_bluevsoficial[1],
+      icon = icon(info_bluevsoficial()[2]),
+      color = info_bluevsoficial()[1],
       width = 3,
       footer = div(
         paste0(
-          max(bluevsoficial$Fecha)
+          max(bluevsoficial()$Fecha)
         )  
       )
     )
   })
+  
+
+  
+
+  
+  
+  
+
   
   
 }

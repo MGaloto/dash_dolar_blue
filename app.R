@@ -29,9 +29,9 @@ current_hour <- hour(with_tz(Sys.time(), tzone = "America/Argentina/Buenos_Aires
 
 get_day_to = function(today, current_hour){
   day_of_week <- weekdays(today)
-  if (day_of_week == "sábado") {
+  if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-  } else if (day_of_week == "domingo") {
+  } else if (day_of_week == "domingo"|| day_of_week == "Sunday") {
     today <- format(as.Date(today) - days(2), format = "%Y-%m-%d")
   }
   
@@ -350,7 +350,7 @@ ui <- dashboardPage(
         tabName = "dashboard",
         h3("Precios Dolar Economia Argentina"),
         p("Dashboard sobre el precio del dolar en ", 
-          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",to, weekdays(today))),
+          span("Argentina", style = "color: green;"), paste0(". Datos actualizados hasta: ",to)),
         fluidRow(
           bs4ValueBoxOutput("valuebox_1",width = 4),
           bs4ValueBoxOutput("valuebox_2",width = 4),

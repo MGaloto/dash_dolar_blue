@@ -19,11 +19,7 @@ setAccountInfo(name = values_function("SHINY_ACC_NAME"),
 
 
 deployApp(appName="dolartrends",
-          appFiles = c("app.R", 
-                       "etl.R",
-                       "data/dolar.xlsx",
-                       "data/dolarmep.xlsx",
-                       "data/dolaroficial.xlsx"),
+          appFiles = c("app.R"),
           forceUpdate = TRUE)
 
 

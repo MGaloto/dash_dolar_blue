@@ -31,21 +31,23 @@ get_day_to = function(today, current_hour){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+    return(today)
   } else if (day_of_week == "domingo"|| day_of_week == "Sunday") {
     today <- format(as.Date(today) - days(2), format = "%Y-%m-%d")
+    return(today)
   }
   
-  if (current_hour >= 0 && current_hour < 10) {
+  if (current_hour >= 0 && current_hour <= 11) {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+    return(today)
   }
 
-  return(as.Date(today))
 }
 
 
 
 
-to = get_day_to(today, current_hour)
+to = as.Date(get_day_to(today, current_hour))
 from = to - years(1)
 from_historic = from
 
@@ -536,7 +538,7 @@ server <- function(input, output,session) {
   
   
   informal = reactiveVal(rbind(
-    get_dolar(url_informal, from, to) %>% filter(Fecha != to), 
+    get_dolar(url_informal, from, to) %>% filter(Fecha != to, Fecha != today), 
     format_df(as_tibble(get_json(url_informal_diario)))
     ) %>% arrange(Fecha) %>% distinct()
   )
@@ -551,7 +553,7 @@ server <- function(input, output,session) {
   
 
   mep = reactiveVal(rbind(
-    get_mep(url_mep, from, to) %>% filter(Fecha != to), 
+    get_mep(url_mep, from, to) %>% filter(Fecha != to,Fecha != today), 
     format_df(as_tibble(get_json(url_mep_diario))) %>% select(Fecha, Promedio, variacion)
     ) %>% arrange(Fecha) %>% distinct()
   )
@@ -566,7 +568,7 @@ server <- function(input, output,session) {
   
   
   ccl = reactiveVal(rbind(
-    get_ccl(url_ccl, from, to) %>% filter(Fecha != to), 
+    get_ccl(url_ccl, from, to) %>% filter(Fecha != to,Fecha != today), 
     format_df(as_tibble(get_json(url_ccl_diario))) %>% select(Fecha, Promedio, variacion)
     ) %>% arrange(Fecha) %>% distinct()
   )
@@ -581,7 +583,7 @@ server <- function(input, output,session) {
   
   
   oficial = reactiveVal(rbind(
-    get_dolar(url_oficial, from, to) %>% filter(Fecha != to), 
+    get_dolar(url_oficial, from, to) %>% filter(Fecha != to,Fecha != today), 
     format_df(as_tibble(get_json(url_oficial_diario)))
     ) %>% arrange(Fecha) %>% distinct()
   )
@@ -708,7 +710,7 @@ server <- function(input, output,session) {
       hc_chart(type = "column") %>%
       hc_xAxis(categories = df_with_colors$tc) %>%
       hc_add_series(data = df_with_colors$tasa, name = "Precio", colorByPoint = TRUE, colors = df_with_colors$colores) %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Porcentaje Acumulado en el Año: % {point.y}") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Porcentaje Acumulado en el Año: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
       highcharter::hc_xAxis(
         title = list(text = ""),
@@ -766,7 +768,7 @@ server <- function(input, output,session) {
       name = "ver", 
       id = "trend",
       showInLegend = TRUE) %>%
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Variacion: {point.y}%") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Variacion: {point.y}%",valueDecimals=2) %>%
       highcharter::hc_plotOptions(
         line = list(
           color = "blue",
@@ -861,8 +863,8 @@ server <- function(input, output,session) {
         style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
       hc_title(
         text = paste0('Dolar Argentina'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) %>% 
-      hc_add_theme(hc_theme_google())
+        style = list(fontSize = '16px', fontWeight = 'bold', color = "black"))
+    
   })
   
   
@@ -878,7 +880,7 @@ server <- function(input, output,session) {
       hc_add_series(name = "brecha", 
                     data = mepvsoficial()$brecha,
                     color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
       highcharter::hc_xAxis(
         title = list(text = ""),
@@ -924,7 +926,7 @@ server <- function(input, output,session) {
       hc_add_series(name = "brecha", 
                     data = bluevsoficial()$brecha,
                     color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
       highcharter::hc_xAxis(
         title = list(text = ""),
@@ -971,7 +973,7 @@ server <- function(input, output,session) {
       hc_add_series(name = "brecha", 
                     data = bluevsmep()$brecha,
                     color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
       highcharter::hc_xAxis(
         title = list(text = ""),
@@ -1018,7 +1020,7 @@ server <- function(input, output,session) {
       hc_add_series(name = "brecha", 
                     data = cclvsoficial()$brecha,
                     color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}") %>%
+      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
       highcharter::hc_xAxis(
         title = list(text = ""),

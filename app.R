@@ -37,8 +37,12 @@ get_day_to = function(today, current_hour){
     return(today)
   }
   
-  if (current_hour >= 0 && current_hour <= 11) {
+  else if (current_hour >= 0 && current_hour <= 11) {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+    return(today)
+  }
+  
+  else{
     return(today)
   }
 
@@ -47,7 +51,7 @@ get_day_to = function(today, current_hour){
 
 
 
-to = as.Date(get_day_to(today, current_hour))
+to = get_day_to(today, current_hour)
 from = to - years(1)
 from_historic = from
 
@@ -98,11 +102,11 @@ get_json <- function(url) {
         response_json <- jsonlite::fromJSON(response_content, simplifyVector = FALSE)
         return(response_json)
       }, error = function(e) {
-        cat("Error al analizar el JSON:", e$message, "\n")
+        cat("Error al analizar el JSON:", e$message,url, "\n")
         return(NULL)
       })
     } else {
-      cat("La solicitud no se pudo completar. Código de estado:", status, "\n")
+      cat("La solicitud no se pudo completar. Código de estado:", status,url, "\n")
       return(NULL)
     }
   }, error = function(e) {

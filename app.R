@@ -31,19 +31,19 @@ get_day_to = function(today, current_hour){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-    return(today)
+    return(as.Date(today))
   } else if (day_of_week == "domingo"|| day_of_week == "Sunday") {
     today <- format(as.Date(today) - days(2), format = "%Y-%m-%d")
-    return(today)
+    return(as.Date(today))
   }
   
   else if (current_hour >= 0 && current_hour <= 11) {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-    return(today)
+    return(as.Date(today))
   }
   
   else{
-    return(today)
+    return(as.Date(today))
   }
 
 }

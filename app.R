@@ -68,6 +68,13 @@ url_oficial_diario <- "https://mercados.ambito.com//dolar/oficial/variacion"
 
 
 
+                     
+CCL_COLOR = "#2dcc72"
+MEP_COLOR = "#1b7bc4"
+INFORMAL_COLOR = "#5dadbd"
+OFICIAL_COLOR = "#cfc5b7"
+
+
 get_df_fill = function(df, from_historic){
   df = df %>% filter(Fecha >= from_historic)
   columns = c("mep","ccl","informal","oficial")
@@ -278,7 +285,7 @@ get_table = function(df){
         Fecha = colDef(
           name = "Fecha",
           align = "center",
-          minWidth = 120
+          minWidth = 60
         ),
         Promedio = colDef(
           name = "Promedio",
@@ -373,17 +380,26 @@ ui <- dashboardPage(
               solidHeader = TRUE,
               tabPanel(
                 title = "Var",
-                dateRangeInput(
-                  "daterange", 
-                  label = "Rango de Fechas",
-                  start  = from,
-                  end    = to,
-                  min    = from,
-                  max    = to,
-                  format = "dd/mm/yyyy",
-                  separator = " - ",
-                  language = "es"
-                ),
+                fluidRow(
+                  column(6, dateRangeInput(
+                    "daterange", 
+                    label = "Rango de Fechas",
+                    start  = from,
+                    end    = to,
+                    min    = from,
+                    max    = to,
+                    format = "dd/mm/yyyy",
+                    separator = " - ",
+                    language = "es"
+                  )),
+                  column(6, radioButtons(
+                    "opciones",
+                    "Opciones:",
+                    choices = c("Anual", "Ultima Semana"),
+                    inline = T,
+                    selected = "Anual"))
+                )
+                ,
                 withSpinner(
                   highchartOutput("timeserie"),
                   type = 1
@@ -703,10 +719,10 @@ server <- function(input, output,session) {
   
   output$barplot <- renderHighchart({
     df_with_colors <- df_acumulado_anual() %>%
-      mutate(colores = ifelse(tc == "mep", "#1b7bc4",
-                              ifelse(tc == "ccl", "#2dcc72",
-                                     ifelse(tc == "informal", "#5dadbd",
-                                            ifelse(tc == "oficial", "#cfc5b7", NA))))) %>% 
+      mutate(colores = ifelse(tc == "mep", MEP_COLOR,
+                              ifelse(tc == "ccl", CCL_COLOR,
+                                     ifelse(tc == "informal", INFORMAL_COLOR,
+                                            ifelse(tc == "oficial", OFICIAL_COLOR, NA))))) %>% 
       arrange(desc(tasa))
     
     
@@ -824,29 +840,37 @@ server <- function(input, output,session) {
   
   output$timeserie <- renderHighchart({
     
-    dolar_merge_filter = dolar_merge() %>% filter(Fecha >= input$daterange[1], Fecha <= input$daterange[2])
+    if (input$opciones == "Anual"){
+      dolar_merge_filter = dolar_merge() %>% 
+        filter(Fecha >= input$daterange[1], Fecha <= input$daterange[2])
+    } else {
+      dolar_merge_filter = dolar_merge() %>% arrange(Fecha)
+      dolar_merge_filter = tail(dolar_merge_filter, 7)
+    }
+    
+    
     
     highchart() %>%
       hc_xAxis(categories = dolar_merge_filter$Fecha) %>%
       hc_add_series(dolar_merge_filter$ccl, 
                     name = "CCL", 
                     type = "line",
-                    color = "#2dcc72",
+                    color = CCL_COLOR,
                     tooltip = list(valueDecimals = 2)) %>%
       hc_add_series(dolar_merge_filter$mep, 
                     name = "Mep",
                     type = "line",
-                    color = "#1b7bc4",
+                    color = MEP_COLOR,
                     tooltip = list(valueDecimals = 2)) %>%
       hc_add_series(dolar_merge_filter$informal,
                     name = 'Informal', 
                     type = "line",
-                    color = "#5dadbd",
+                    color = INFORMAL_COLOR,
                     tooltip = list(valueDecimals = 2)) %>%
       hc_add_series(dolar_merge_filter$oficial, 
                     name = "Oficial",
                     type = "line",
-                    color = "#cfc5b7",
+                    color = OFICIAL_COLOR,
                     tooltip = list(valueDecimals = 2)) %>%
       hc_title(text = "Gráfico de Líneas con Tres Series de Tiempo") %>%
       hc_yAxis(title = list(text = "Valor")) %>%
@@ -1172,13 +1196,6 @@ server <- function(input, output,session) {
   })
   
 
-  
-
-  
-  
-  
-
-  
   
 }
 

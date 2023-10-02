@@ -450,8 +450,17 @@ get_df_fill = function(df, from_historic){
   df = df %>% filter(Fecha >= from_historic)
   columns = c("mep","ccl","informal","oficial")
   for (col in columns){
+    print(col)
+    
+    ult_value = df[nrow(df),col]
+    if (is.na(ult_value)){
+      ante_ult_value = dolar[nrow(dolar) - 1,col]
+      df[nrow(df),col] = ante_ult_value
+    } 
+    
     posiciones_na <- which(is.na(df[, col]))
     for (pos in posiciones_na){
+      print(pos)
       numero = pos
       while (TRUE) {
         numero <- numero + 1
@@ -468,6 +477,8 @@ get_df_fill = function(df, from_historic){
 
 
 d=get_df_fill(dolar,from_historic)
+
+
 
 
 

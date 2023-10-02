@@ -38,8 +38,15 @@ get_day_to = function(today, current_hour){
   }
   
   else if (current_hour >= 0 && current_hour <= 11) {
-    today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-    return(as.Date(today))
+    
+    if (day_of_week == "lunes" || day_of_week == "Monday"){
+      today <- format(as.Date(today) - days(3), format = "%Y-%m-%d")
+      return(as.Date(today))
+    } else {
+      today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
+      return(as.Date(today))
+    }
+    
   }
   
   else{
@@ -79,6 +86,13 @@ get_df_fill = function(df, from_historic){
   df = df %>% filter(Fecha >= from_historic)
   columns = c("mep","ccl","informal","oficial")
   for (col in columns){
+    
+    ult_value = df[nrow(df),col]
+    if (is.na(ult_value)){
+      ante_ult_value = dolar[nrow(dolar) - 1,col]
+      df[nrow(df),col] = ante_ult_value
+    } 
+    
     posiciones_na <- which(is.na(df[, col]))
     for (pos in posiciones_na){
       numero = pos

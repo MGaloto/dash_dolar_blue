@@ -89,7 +89,7 @@ get_df_fill = function(df, from_historic){
     
     ult_value = df[nrow(df),col]
     if (is.na(ult_value)){
-      ante_ult_value = dolar[nrow(dolar) - 1,col]
+      ante_ult_value = df[nrow(df) - 1,col]
       df[nrow(df),col] = ante_ult_value
     } 
     

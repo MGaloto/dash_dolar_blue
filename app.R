@@ -145,35 +145,6 @@ ultima_actualizacion = function(ccl_day, oficial_day, informal_day, mep_day) {
 
 
 
-format_df = function(df){
-  if ("Promedio" %in% colnames(df)) {
-    return(df %>%
-             arrange(Fecha) %>% 
-             mutate(Promedio = round(as.numeric(gsub(",", ".", Promedio)),2)) %>% 
-             mutate(variacion = round((as.numeric(Promedio) - lag(as.numeric(Promedio), n = 1)) / lag(as.numeric(Promedio), n = 1),4)*100) %>% 
-             select(Fecha, Promedio, variacion))
-  }  else if ("valor_cierre_ant" %in% colnames(df)) {
-    return(
-      df %>% mutate(
-        Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
-        Compra = round(as.numeric(gsub(",", ".", compra)),2),
-        Venta = round(as.numeric(gsub(",", ".", venta)),2),
-        Promedio = ((Compra + Venta) / 2),
-        variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
-        select(Fecha, Compra, Venta, Promedio, variacion)
-    )
-  } else {
-    return(
-      df %>% arrange(Fecha) %>% mutate(
-        Fecha = as.Date(Fecha, format = "%d/%m/%Y"),
-        Compra = round(as.numeric(gsub(",", ".", Compra)),2),
-        Venta = round(as.numeric(gsub(",", ".", Venta)),2),
-        Promedio = ((Compra + Venta) / 2),
-        variacion = round((Promedio - lag(Promedio, n = 1)) / lag(Promedio, n = 1),4)*100) %>%
-        select(Fecha, Compra, Venta, Promedio, variacion)
-    ) 
-  }
-}
 
 
 format_df_diario = function(df){
@@ -191,60 +162,158 @@ format_df_diario = function(df){
 
 
 
+format_df_informal = function(df){
+  return(
+    df %>% mutate(
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
+}
 
-get_dolar = function(url, from, to){
+
+
+get_dolar_informal = function(url, from, to){
   url_historico <- paste0(url, from,"/",to)
   response_json = get_json(url_historico)
   data_frame <- response_json %>%
     purrr::map_dfr(~setNames(as.list(.x), c("Fecha", "Compra", "Venta")))
   mi_tibble <- as_tibble(data_frame)[-1, ]
-  mi_tibble <- mi_tibble %>% 
+  df <- mi_tibble %>% 
     mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
     arrange(Fecha) %>%
     group_by(Fecha) %>%
     filter(Venta == max(Venta)) %>%
     ungroup() %>% 
     distinct()
-  return(format_df(mi_tibble))
+  return(
+    df %>% arrange(Fecha) %>% mutate(
+      Fecha = as.Date(Fecha, format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", Compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", Venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round((Promedio - lag(Promedio, n = 1)) / lag(Promedio, n = 1),4)*100) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
 }
 
 
 
-
-
-get_mep = function(url, from, to){
+get_dolar_mep = function(url, from, to){
   url_historico <- paste0(url, from,"/",to)
   response_json = get_json(url_historico)
   data_frame <- data.frame(matrix(unlist(response_json), ncol = 2, byrow = TRUE), stringsAsFactors = FALSE)
   colnames(data_frame) <- c("Fecha", "Promedio")
   mi_tibble <- as_tibble(data_frame)[-1, ]
-  mi_tibble <- mi_tibble %>% 
+  df <- mi_tibble %>% 
     mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
     arrange(Fecha) %>%
     group_by(Fecha) %>%
     filter(Promedio == max(Promedio)) %>%
     ungroup() %>% 
     distinct()
-  return(format_df(mi_tibble))
+  
+  return(
+    df %>%
+      arrange(Fecha) %>% 
+      mutate(Promedio = round(as.numeric(gsub(",", ".", Promedio)),2)) %>% 
+      mutate(variacion = round((as.numeric(Promedio) - 
+                                  lag(as.numeric(Promedio), n = 1)) / 
+                                 lag(as.numeric(Promedio), n = 1),4)*100) %>% 
+      select(Fecha, Promedio, variacion)
+  )
+}
+
+
+format_df_mep = function(df){
+  return(
+    df %>% mutate(
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
 }
 
 
 
-
-get_ccl = function(url, from, to){
+get_dolar_ccl = function(url, from, to){
   url_historico <- paste0(url, from,"/",to)
   response_json = get_json(url_historico)
   data_frame <- data.frame(matrix(unlist(response_json), ncol = 2, byrow = TRUE), stringsAsFactors = FALSE)
   colnames(data_frame) <- c("Fecha", "Promedio")
   mi_tibble <- na.omit(as_tibble(data_frame)[-1, ])
-  mi_tibble <- mi_tibble %>% 
+  df <- mi_tibble %>% 
     mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
     arrange(Fecha) %>%
     group_by(Fecha) %>%
     filter(Promedio == max(Promedio)) %>%
     ungroup() %>% 
     distinct()
-  return(format_df(mi_tibble))
+  return(df %>%
+           arrange(Fecha) %>% 
+           mutate(Promedio = round(as.numeric(gsub(",", ".", Promedio)),2)) %>% 
+           mutate(variacion = round((as.numeric(Promedio) - 
+                                       lag(as.numeric(Promedio), n = 1)) / 
+                                      lag(as.numeric(Promedio), n = 1),4)*100) %>% 
+           select(Fecha, Promedio, variacion))
+}
+
+
+format_df_ccl = function(df){
+  return(
+    df %>% mutate(
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
+}
+
+
+get_dolar_oficial = function(url, from, to){
+  url_historico <- paste0(url, from,"/",to)
+  response_json = get_json(url_historico)
+  data_frame <- response_json %>%
+    purrr::map_dfr(~setNames(as.list(.x), c("Fecha", "Compra", "Venta")))
+  mi_tibble <- as_tibble(data_frame)[-1, ]
+  df <- mi_tibble %>% 
+    mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
+    arrange(Fecha) %>%
+    group_by(Fecha) %>%
+    filter(Venta == max(Venta)) %>%
+    ungroup() %>% 
+    distinct()
+  return(
+    df %>% arrange(Fecha) %>% mutate(
+      Fecha = as.Date(Fecha, format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", Compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", Venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round((Promedio - lag(Promedio, n = 1)) / lag(Promedio, n = 1),4)*100) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  ) 
+}
+
+
+
+format_df_oficial= function(df){
+  return(
+    df %>% mutate(
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
 }
 
 
@@ -570,27 +639,46 @@ ui <- dashboardPage(
 server <- function(input, output,session) {
   
   
+  informal_json_diario = format_df_informal(
+    as_tibble(get_json(url_informal_diario))
+  )
+  
+  informal_json_anual = get_dolar_informal(url_informal, from, to) %>% 
+    filter(Fecha != to, Fecha != today)
+
   
   informal = reactiveVal(rbind(
-    get_dolar(url_informal, from, to) %>% filter(Fecha != to, Fecha != today), 
-    format_df(as_tibble(get_json(url_informal_diario)))
-    ) %>% arrange(Fecha) %>% distinct()
-  )
-  
-  informal_day = reactive(format_df_diario(
-    as_tibble(
-      get_json(url_informal_diario)
-      )
-    )
+    informal_json_anual, 
+    informal_json_diario
+  ) %>% arrange(Fecha) %>% distinct()
   )
   
   
-
+  
+  informal_day = reactive(
+    format_df_diario(
+    as_tibble(get_json(url_informal_diario))
+  )
+  )
+  
+  
+  
+  
+  mep_json_diario = format_df_mep(as_tibble(get_json(url_mep_diario))) %>% 
+    select(Fecha, Promedio, variacion)
+  
+  
+  mep_json_anual = get_dolar_mep(url_mep, from, to) %>% 
+    filter(Fecha != to,Fecha != today)
+  
+  
+  
   mep = reactiveVal(rbind(
-    get_mep(url_mep, from, to) %>% filter(Fecha != to,Fecha != today), 
-    format_df(as_tibble(get_json(url_mep_diario))) %>% select(Fecha, Promedio, variacion)
-    ) %>% arrange(Fecha) %>% distinct()
+    mep_json_anual, 
+    mep_json_diario
+  ) %>% arrange(Fecha) %>% distinct()
   )
+  
   
   mep_day = reactive(format_df_diario(
     as_tibble(
@@ -601,11 +689,25 @@ server <- function(input, output,session) {
   
   
   
+  
+  
+  
+  ccl_json_diario = format_df_ccl(as_tibble(get_json(url_ccl_diario)) ) %>% 
+    select(Fecha, Promedio, variacion)
+  
+  
+  ccl_json_anual = get_dolar_ccl(url_ccl, from, to) %>% 
+    filter(Fecha != to,Fecha != today)
+  
+  
+  
+  
   ccl = reactiveVal(rbind(
-    get_ccl(url_ccl, from, to) %>% filter(Fecha != to,Fecha != today), 
-    format_df(as_tibble(get_json(url_ccl_diario))) %>% select(Fecha, Promedio, variacion)
-    ) %>% arrange(Fecha) %>% distinct()
+    ccl_json_anual, 
+    ccl_json_diario
+  ) %>% arrange(Fecha) %>% distinct()
   )
+  
   
   ccl_day = reactive(format_df_diario(
     as_tibble(
@@ -613,14 +715,31 @@ server <- function(input, output,session) {
       )
     )
   )
-
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  oficial_json_diario = format_df_oficial(as_tibble(get_json(url_oficial_diario)))
+  
+  
+  oficial_json_anual = get_dolar_oficial(url_oficial, from, to) %>% 
+    filter(Fecha != to,Fecha != today)
+  
   
   
   oficial = reactiveVal(rbind(
-    get_dolar(url_oficial, from, to) %>% filter(Fecha != to,Fecha != today), 
-    format_df(as_tibble(get_json(url_oficial_diario)))
-    ) %>% arrange(Fecha) %>% distinct()
+    oficial_json_anual, 
+    oficial_json_diario
+  ) %>% arrange(Fecha) %>% distinct()
   )
+  
   
   oficial_day = reactive(format_df_diario(
     as_tibble(
@@ -628,8 +747,8 @@ server <- function(input, output,session) {
       )
     )
   )
-
-
+  
+  
   
   ultima_hora = reactive(ultima_actualizacion(
     ccl_day(), oficial_day(), informal_day(), mep_day()

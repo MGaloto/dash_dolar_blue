@@ -72,19 +72,20 @@ url_mep = "https://mercados.ambito.com//dolarrava/mep/grafico/"
 url_mep_diario <- "https://mercados.ambito.com///dolarrava/mep/variacion"
 url_oficial = "https://mercados.ambito.com//dolar/oficial/historico-general/"
 url_oficial_diario <- "https://mercados.ambito.com//dolar/oficial/variacion"
-
-
+url_tarjeta = "https://mercados.ambito.com//dolarturista/historico-general/"
+url_tarjeta_diario = "https://mercados.ambito.com//dolarturista/variacion"
 
                      
 CCL_COLOR = "#2dcc72"
 MEP_COLOR = "#1b7bc4"
 INFORMAL_COLOR = "#5dadbd"
 OFICIAL_COLOR = "#cfc5b7"
+TARJETA_COLOR = "#2e2e2d"
 
 
 get_df_fill = function(df, from_historic){
   df = df %>% filter(Fecha >= from_historic)
-  columns = c("mep","ccl","informal","oficial")
+  columns = c("mep","ccl","informal","oficial", "tarjeta")
   for (col in columns){
     
     ult_value = df[nrow(df),col]
@@ -228,11 +229,53 @@ get_dolar_mep = function(url, from, to){
 }
 
 
+
+get_dolar_tarjeta = function(url, from, to){
+  url_historico <- paste0(url, from,"/",to)
+  response_json = get_json(url_historico)
+  data_frame <- data.frame(matrix(unlist(response_json), ncol = 2, byrow = TRUE), stringsAsFactors = FALSE)
+  colnames(data_frame) <- c("Fecha", "Promedio")
+  mi_tibble <- as_tibble(data_frame)[-1, ]
+  df <- mi_tibble %>% 
+    mutate(Fecha = as.Date(Fecha, format = "%d/%m/%Y")) %>%
+    arrange(Fecha) %>%
+    group_by(Fecha) %>%
+    filter(Promedio == max(Promedio)) %>%
+    ungroup() %>% 
+    distinct()
+  
+  return(
+    df %>%
+      arrange(Fecha) %>% 
+      mutate(Promedio = round(as.numeric(gsub(",", ".", Promedio)),2)) %>% 
+      mutate(variacion = round((as.numeric(Promedio) - 
+                                  lag(as.numeric(Promedio), n = 1)) / 
+                                 lag(as.numeric(Promedio), n = 1),4)*100) %>% 
+      select(Fecha, Promedio, variacion)
+  )
+}
+
+
+
 format_df_mep = function(df){
   return(
     df %>% mutate(
       Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
       Compra = round(as.numeric(gsub(",", ".", compra)),2),
+      Venta = round(as.numeric(gsub(",", ".", venta)),2),
+      Promedio = ((Compra + Venta) / 2),
+      variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
+      select(Fecha, Compra, Venta, Promedio, variacion)
+  )
+}
+
+
+
+format_df_tarjeta = function(df){
+  return(
+    df %>% mutate(
+      Fecha = as.Date(strsplit(fecha, " - ")[[1]][1], format = "%d/%m/%Y"),
+      Compra = round(as.numeric(gsub(",", ".", venta)),2),
       Venta = round(as.numeric(gsub(",", ".", venta)),2),
       Promedio = ((Compra + Venta) / 2),
       variacion = round(as.numeric(gsub(",", ".", gsub("%", "", variacion))),4)) %>%
@@ -318,7 +361,7 @@ format_df_oficial= function(df){
 
 
 acumulado_df = function(df){
-  columns = c("mep","ccl","informal","oficial")
+  columns = c("mep","ccl","informal","oficial", "tarjeta")
   max_year_filter = year(max(df$Fecha))
   data_filter = df %>% filter(year(Fecha)==max_year_filter) %>% select(Fecha) 
   min_date_filter = min(data_filter$Fecha)
@@ -518,7 +561,7 @@ ui <- dashboardPage(
               tabPanel(
                 title = "Variacion Dolar Blue",
                 radioButtons("tc", "Seleccionar el Tipo de Cambio",
-                             c("Informal" , "Ccl", "Mep" , "Oficial"), 
+                             c("Informal" , "Ccl", "Mep" , "Oficial", "Tarjeta"), 
                              inline = T),
                 withSpinner(
                   highchartOutput("varplot"),
@@ -573,7 +616,7 @@ ui <- dashboardPage(
       ),
       tabItem(
         tabName = "datos",
-        p("Datos de los 4 Tipos de Cambio."),
+        p("Datos de los 5 Tipos de Cambio."),
         fluidRow(
           column(12,
                  tabBox(
@@ -597,6 +640,10 @@ ui <- dashboardPage(
                    tabPanel(
                      title = "Dolar Oficial",
                      reactable::reactableOutput("table_oficial_output")
+                   ),
+                   tabPanel(
+                     title = "Dolar Tarjeta",
+                     reactable::reactableOutput("table_tarjeta_output")
                    )
                  )
           )
@@ -691,6 +738,33 @@ server <- function(input, output,session) {
   
   
   
+  tarjeta_json_diario = format_df_tarjeta(as_tibble(get_json(url_tarjeta_diario))) %>% 
+    select(Fecha, Promedio, variacion)
+  
+  
+  tarjeta_json_anual = get_dolar_tarjeta(url_tarjeta, from, to) %>% 
+    filter(Fecha != to,Fecha != today)
+  
+  
+  
+  tarjeta = reactiveVal(rbind(
+    tarjeta_json_anual, 
+    tarjeta_json_diario
+  ) %>% arrange(Fecha) %>% distinct()
+  )
+  
+  
+  tarjeta_day = reactive(format_df_diario(
+    as_tibble(
+      get_json(url_tarjeta_diario)
+    )
+  )
+  )
+  
+  
+  
+  
+  
   
   ccl_json_diario = format_df_ccl(as_tibble(get_json(url_ccl_diario)) ) %>% 
     select(Fecha, Promedio, variacion)
@@ -759,20 +833,25 @@ server <- function(input, output,session) {
   
   
   
-  dolar <- reactive(merge(
+  dolar <- reactive(
     merge(
       merge(
-        informal() %>% select(Fecha, Promedio) %>% rename(informal = Promedio), 
-        ccl() %>% select(Fecha, Promedio) %>% rename(ccl = Promedio), by = "Fecha", all = TRUE), 
-      mep() %>% select(Fecha, Promedio) %>% rename(mep = Promedio), by = "Fecha", all = TRUE), 
-    oficial() %>% select(Fecha, Promedio) %>% rename(oficial = Promedio), by = "Fecha", all = TRUE))
-  
-  
+        merge(
+          merge(
+            informal() %>% select(Fecha, Promedio) %>% rename(informal = Promedio), 
+            ccl() %>% select(Fecha, Promedio) %>% rename(ccl = Promedio), by = "Fecha", all = TRUE), 
+          mep() %>% select(Fecha, Promedio) %>% rename(mep = Promedio), by = "Fecha", all = TRUE), 
+        oficial() %>% select(Fecha, Promedio) %>% rename(oficial = Promedio), by = "Fecha", all = TRUE),
+        tarjeta() %>% select(Fecha, Promedio) %>% rename(tarjeta = Promedio), by = "Fecha", all = TRUE)
+    )
+      
+      
   
   dolarmepcierre = reactive(mep()$Promedio[nrow(mep())])
   dolaroficialcierre = reactive(oficial()$Promedio[nrow(oficial())])
   dolarbluecierre = reactive(informal()$Promedio[nrow(informal())])
   dolarcclcierre = reactive(ccl()$Promedio[nrow(ccl())])
+  dolartarjetacierre = reactive(tarjeta()$Promedio[nrow(tarjeta())])
   
   
   mepvsoficial = reactive(
@@ -848,6 +927,9 @@ server <- function(input, output,session) {
   output$table_ccl_output <- reactable::renderReactable({
     get_table(ccl())
   })
+  output$table_tarjeta_output <- reactable::renderReactable({
+    get_table(tarjeta())
+  })
   
   
   output$barplot <- renderHighchart({
@@ -855,7 +937,8 @@ server <- function(input, output,session) {
       mutate(colores = ifelse(tc == "mep", MEP_COLOR,
                               ifelse(tc == "ccl", CCL_COLOR,
                                      ifelse(tc == "informal", INFORMAL_COLOR,
-                                            ifelse(tc == "oficial", OFICIAL_COLOR, NA))))) %>% 
+                                            ifelse(tc =="tarjeta", TARJETA_COLOR,
+                                              ifelse(tc == "oficial", OFICIAL_COLOR, NA)))))) %>% 
       arrange(desc(tasa))
     
     
@@ -906,8 +989,10 @@ server <- function(input, output,session) {
       df = mep()
     } else if (input$tc == "Ccl") {
       df = ccl()
+    } else if (input$tc == "Tarjeta") {
+      df = tarjeta()
     } else {
-      df = informal()
+      df = oficial()
     }
     
     highcharter::hchart(
@@ -1004,6 +1089,11 @@ server <- function(input, output,session) {
                     name = "Oficial",
                     type = "line",
                     color = OFICIAL_COLOR,
+                    tooltip = list(valueDecimals = 2)) %>%
+      hc_add_series(dolar_merge_filter$tarjeta, 
+                    name = "Tarjeta",
+                    type = "line",
+                    color = TARJETA_COLOR,
                     tooltip = list(valueDecimals = 2)) %>%
       hc_title(text = "Gráfico de Líneas con Tres Series de Tiempo") %>%
       hc_yAxis(title = list(text = "Valor")) %>%
@@ -1226,6 +1316,7 @@ server <- function(input, output,session) {
         "Blue: $", as.character(dolarbluecierre()),"<br>",
         "Mep: $", as.character(dolarmepcierre()),"<br>",
         "Ccl: $", as.character(dolarcclcierre()),"<br>",
+        "Tarjeta: $", as.character(dolartarjetacierre()),"<br>",
         "Oficial: $", as.character(dolaroficialcierre())),
       icon = icon("dollar-sign"),
       color = "teal",
@@ -1241,6 +1332,7 @@ server <- function(input, output,session) {
         "Blue: %", as.character(round(((informal()$Promedio[informal()$Fecha == max(informal()$Fecha)]-informal()$Promedio[informal()$Fecha == min(informal()$Fecha)])/informal()$Promedio[informal()$Fecha == min(informal()$Fecha)])*100,2)),"<br>",
         "Mep: %", as.character(round(((mep()$Promedio[mep()$Fecha == max(mep()$Fecha)]-mep()$Promedio[mep()$Fecha == min(mep()$Fecha)])/mep()$Promedio[mep()$Fecha == min(mep()$Fecha)])*100,2)),"<br>",
         "Ccl: %", as.character(round(((ccl()$Promedio[ccl()$Fecha == max(ccl()$Fecha)]-ccl()$Promedio[ccl()$Fecha == min(ccl()$Fecha)])/ccl()$Promedio[ccl()$Fecha == min(ccl()$Fecha)])*100,2)),"<br>",
+        "Tarjeta: %", as.character(round(((tarjeta()$Promedio[tarjeta()$Fecha == max(tarjeta()$Fecha)]-tarjeta()$Promedio[tarjeta()$Fecha == min(tarjeta()$Fecha)])/tarjeta()$Promedio[tarjeta()$Fecha == min(tarjeta()$Fecha)])*100,2)),"<br>",
         "Oficial: %", as.character(round(((oficial()$Promedio[oficial()$Fecha == max(oficial()$Fecha)]-oficial()$Promedio[oficial()$Fecha == min(oficial()$Fecha)])/oficial()$Promedio[oficial()$Fecha == min(oficial()$Fecha)])*100,2))),
       icon = icon("info"),
       color = "teal",
@@ -1264,6 +1356,7 @@ server <- function(input, output,session) {
         "Blue: ", as.character(informal_day()$variacion)," %<br>",
         "Mep: ", as.character(mep_day()$variacion)," %<br>",
         "Ccl: ", as.character(ccl_day()$variacion)," %<br>",
+        "Tarjeta: ", as.character(tarjeta_day()$variacion)," %<br>",
         "Oficial: ", as.character(oficial_day()$variacion)," %"),
       icon = icon("coins"),
       color = "teal",

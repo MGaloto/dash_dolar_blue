@@ -502,6 +502,7 @@ ui <- dashboardPage(
               title = "Serie Temporal",
               width = 12,
               status = "teal",
+              maximizable = T,
               icon = icon("chart-line"),
               solidHeader = TRUE,
               tabPanel(

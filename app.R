@@ -22,43 +22,79 @@ today = as.Date(format(
   format = "%Y-%m-%d"
 ))
 
+year = year(today)
 
-current_hour <- hour(with_tz(Sys.time(), tzone = "America/Argentina/Buenos_Aires"))
+obtener_feriados_argentina <- function(anio) {
+  url <- paste("https://nolaborables.com.ar/api/v2/feriados/", anio, "?incluir=opcional", sep = "")
+  response <- GET(url)
+  if (http_type(response) == "application/json") {
+    feriados <- content(response, "parsed")
+    return(feriados)
+  } else {
+    warning("No se pudo obtener la información de los feriados.")
+    return(NULL)
+  }
+}
+
+feriados_lista <- obtener_feriados_argentina(year)
+
+fechas_feriados <- character(length(feriados_lista))
+
+for (i in seq_along(feriados_lista)) {
+  fecha <- paste(year, feriados_lista[[i]]$mes, feriados_lista[[i]]$dia, sep = "-")
+  fechas_feriados[i] <- format(as.Date(fecha), "%Y-%m-%d")
+}
 
 
 
-get_day_to = function(today, current_hour){
+
+current_hour <- hour(with_tz(
+  Sys.time(), tzone = "America/Argentina/Buenos_Aires")
+  )
+
+
+get_day_to = function(today, current_hour, feriados){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-    return(as.Date(today))
+    fecha_final = as.Date(today)
   } else if (day_of_week == "domingo"|| day_of_week == "Sunday") {
     today <- format(as.Date(today) - days(2), format = "%Y-%m-%d")
-    return(as.Date(today))
+    fecha_final = as.Date(today)
   }
   
   else if (current_hour >= 0 && current_hour <= 11) {
     
     if (day_of_week == "lunes" || day_of_week == "Monday"){
       today <- format(as.Date(today) - days(3), format = "%Y-%m-%d")
-      return(as.Date(today))
+      fecha_final = as.Date(today)
     } else {
       today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
-      return(as.Date(today))
+      fecha_final = as.Date(today)
+    }
+    
+    while (TRUE) {
+      if (fecha_final %in% feriados) {
+        fecha_final <- as.Date(fecha_final) - 1
+      } else {
+        break
+      }
     }
     
   }
   
   else{
-    return(as.Date(today))
+    fecha_final = as.Date(today)
   }
+  
+  return(fecha_final)
 
 }
 
 
 
 
-to = get_day_to(today, current_hour)
+to = get_day_to(today, current_hour, fechas_feriados)
 from = to - years(1)
 from_historic = from
 

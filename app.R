@@ -628,6 +628,30 @@ ui <- dashboardPage(
         ),
         fluidRow(
           column(
+            width = 4,
+            box(
+              title = "Date Filter",
+              status = "gray",
+              icon = icon("keyboard"),
+              solidHeader = TRUE,
+              width = 12,
+              tabPanel(
+                title = "Date Filter",
+                dateRangeInput(
+                  "daterangebrechas", 
+                  label = "Rango de Fechas",
+                  start  = from,
+                  end    = to,
+                  min    = from,
+                  max    = to,
+                  format = "dd/mm/yyyy",
+                  separator = " - ",
+                  language = "es"
+                )
+              )
+            )
+          ),
+          column(
             width = 8,
                  tabBox(title = "",
                         status = "gray",
@@ -655,30 +679,6 @@ ui <- dashboardPage(
                             highchartOutput("barplot_cclvsoficial"))
                         )
                  )
-          ),
-          column(
-            width = 4,
-            box(
-              title = "Date Filter",
-              status = "gray",
-              icon = icon("keyboard"),
-              solidHeader = TRUE,
-              width = 12,
-              tabPanel(
-                title = "Date Filter",
-                dateRangeInput(
-                  "daterangebrechas", 
-                  label = "Rango de Fechas",
-                  start  = from,
-                  end    = to,
-                  min    = from,
-                  max    = to,
-                  format = "dd/mm/yyyy",
-                  separator = " - ",
-                  language = "es"
-                )
-              )
-            )
           )
         )
       ),

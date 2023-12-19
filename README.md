@@ -31,7 +31,7 @@ Dashboard del Dolar Paralelo Argentina
 <br>
 </br>
 
-Aplicacion de precios del dolar en Argentina utilizando el framework [bs4Dash](https://rinterface.github.io/bs4Dash/). 
+Aplicacion en prod de precios del dolar en Argentina utilizando el framework [bs4Dash](https://rinterface.github.io/bs4Dash/). 
 
 El Dashboard contiene la siguientes funcionalidades para interactuar con la API de ambito financiero y obtener Insights sobre variaciones y brechas cambiarias en distintos momentos del dia/semana/mes.
 

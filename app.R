@@ -16,6 +16,7 @@ library(rvest)
 
 
 
+
 today = as.Date(format(
   with_tz(Sys.time() , 
           tzone = "America/Argentina/Buenos_Aires"), 
@@ -36,14 +37,14 @@ obtener_feriados_argentina <- function(anio) {
   }
 }
 
-feriados_lista <- obtener_feriados_argentina(year)
+#feriados_lista <- obtener_feriados_argentina(year)
 
-fechas_feriados <- character(length(feriados_lista))
+#fechas_feriados <- character(length(feriados_lista))
 
-for (i in seq_along(feriados_lista)) {
-  fecha <- paste(year, feriados_lista[[i]]$mes, feriados_lista[[i]]$dia, sep = "-")
-  fechas_feriados[i] <- format(as.Date(fecha), "%Y-%m-%d")
-}
+#for (i in seq_along(feriados_lista)) {
+#  fecha <- paste(year, feriados_lista[[i]]$mes, feriados_lista[[i]]$dia, sep = "-")
+#  fechas_feriados[i] <- format(as.Date(fecha), "%Y-%m-%d")
+#}
 
 
 
@@ -53,7 +54,7 @@ current_hour <- hour(with_tz(
   )
 
 
-get_day_to = function(today, current_hour, feriados){
+get_day_to = function(today, current_hour, feriados=NULL){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
@@ -73,12 +74,15 @@ get_day_to = function(today, current_hour, feriados){
       fecha_final = as.Date(today)
     }
     
-    while (TRUE) {
-      if (fecha_final %in% feriados) {
-        fecha_final <- as.Date(fecha_final) - 1
-      } else {
-        break
+    if (!is.na(feriados)){
+      while (TRUE) {
+        if (fecha_final %in% feriados) {
+          fecha_final <- as.Date(fecha_final) - 1
+        } else {
+          break
+        }
       }
+      
     }
     
   }
@@ -94,7 +98,7 @@ get_day_to = function(today, current_hour, feriados){
 
 
 
-to = get_day_to(today, current_hour, fechas_feriados)
+to = get_day_to(today, current_hour)
 from = to - years(1)
 from_historic = from
 

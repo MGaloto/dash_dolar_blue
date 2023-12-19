@@ -15,7 +15,7 @@ library(httr)
 library(rvest)
 
 
-
+obtener_feriados = FALSE
 
 today = as.Date(format(
   with_tz(Sys.time() , 
@@ -37,15 +37,18 @@ obtener_feriados_argentina <- function(anio) {
   }
 }
 
-#feriados_lista <- obtener_feriados_argentina(year)
 
-#fechas_feriados <- character(length(feriados_lista))
-
-#for (i in seq_along(feriados_lista)) {
-#  fecha <- paste(year, feriados_lista[[i]]$mes, feriados_lista[[i]]$dia, sep = "-")
-#  fechas_feriados[i] <- format(as.Date(fecha), "%Y-%m-%d")
-#}
-
+if (obtener_feriados == TRUE){
+  feriados_lista <- obtener_feriados_argentina(year)
+  
+  fechas_feriados <- character(length(feriados_lista))
+  
+  for (i in seq_along(feriados_lista)) {
+    fecha <- paste(year, feriados_lista[[i]]$mes, feriados_lista[[i]]$dia, sep = "-")
+    fechas_feriados[i] <- format(as.Date(fecha), "%Y-%m-%d")
+  }
+  
+}
 
 
 
@@ -101,7 +104,6 @@ get_day_to = function(today, current_hour, feriados=NULL){
 to = get_day_to(today, current_hour)
 from = to - years(1)
 from_historic = from
-
 
 
 url_ccl = "https://mercados.ambito.com//dolarrava/cl/historico-general/"
@@ -625,7 +627,8 @@ ui <- dashboardPage(
           bs4ValueBoxOutput("valuebox_brechas_3",width = 4),
         ),
         fluidRow(
-          column(12,
+          column(
+            width = 8,
                  tabBox(title = "",
                         status = "gray",
                         width = 12, 
@@ -652,6 +655,30 @@ ui <- dashboardPage(
                             highchartOutput("barplot_cclvsoficial"))
                         )
                  )
+          ),
+          column(
+            width = 4,
+            box(
+              title = "Date Filter",
+              status = "gray",
+              icon = icon("keyboard"),
+              solidHeader = TRUE,
+              width = 12,
+              tabPanel(
+                title = "Date Filter",
+                dateRangeInput(
+                  "daterangebrechas", 
+                  label = "Rango de Fechas",
+                  start  = from,
+                  end    = to,
+                  min    = from,
+                  max    = to,
+                  format = "dd/mm/yyyy",
+                  separator = " - ",
+                  language = "es"
+                )
+              )
+            )
           )
         )
       ),
@@ -1164,13 +1191,16 @@ server <- function(input, output,session) {
   
   output$barplot_mepvsoficial <- renderHighchart({
     
+    mepvsoficialfilter = mepvsoficial() %>% 
+      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Mep vs Oficial") %>%
-      hc_xAxis(categories = mepvsoficial()$Fecha) %>%
+      hc_xAxis(categories = mepvsoficialfilter$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = mepvsoficial()$brecha,
+                    data = mepvsoficialfilter$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -1210,13 +1240,16 @@ server <- function(input, output,session) {
   
   output$barplot_bluevsoficial <- renderHighchart({
     
+    bluevsoficialfilter = bluevsoficial() %>% 
+      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Blue vs Oficial") %>%
-      hc_xAxis(categories = bluevsoficial()$Fecha) %>%
+      hc_xAxis(categories = bluevsoficialfilter$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = bluevsoficial()$brecha,
+                    data = bluevsoficialfilter$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -1257,13 +1290,16 @@ server <- function(input, output,session) {
   
   output$barplot_bluevsmep <- renderHighchart({
     
+    bluevsmepfilter = bluevsmep() %>% 
+      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar Blue vs Mep") %>%
-      hc_xAxis(categories = bluevsmep()$Fecha) %>%
+      hc_xAxis(categories = bluevsmepfilter$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = bluevsmep()$brecha,
+                    data = bluevsmepfilter$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%
@@ -1304,13 +1340,16 @@ server <- function(input, output,session) {
   
   output$barplot_cclvsoficial <- renderHighchart({
     
+    cclvsoficialfilter = cclvsoficial() %>% 
+      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    
     highchart() %>%
       hc_chart(type = "column") %>%
       hc_title(text = "Brecha Dolar CCL vs Oficial") %>%
-      hc_xAxis(categories = cclvsoficial()$Fecha) %>%
+      hc_xAxis(categories = cclvsoficialfilter$Fecha) %>%
       hc_yAxis(title = list(text = "Brecha")) %>%
       hc_add_series(name = "brecha", 
-                    data = cclvsoficial()$brecha,
+                    data = cclvsoficialfilter$brecha,
                     color = "#007bff") %>% 
       highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
       highcharter::hc_legend(enabled = FALSE) %>%

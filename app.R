@@ -57,7 +57,7 @@ current_hour <- hour(with_tz(
   )
 
 
-get_day_to = function(today, current_hour, feriados=NULL){
+get_day_to = function(today, current_hour, feriados=FALSE){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")

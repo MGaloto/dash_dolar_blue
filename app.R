@@ -15,7 +15,7 @@ library(httr)
 library(rvest)
 
 
-obtener_feriados = FALSE
+obtener_feriados = TRUE
 
 today = as.Date(format(
   with_tz(Sys.time() , 
@@ -26,7 +26,7 @@ today = as.Date(format(
 year = year(today)
 
 obtener_feriados_argentina <- function(anio) {
-  url <- paste("https://nolaborables.com.ar/api/v2/feriados/", anio, "?incluir=opcional", sep = "")
+  url <- paste("https://nolaborables.com.ar/api/v2/feriaAdos/", anio, "?incluir=opcional", sep = "")
   response <- GET(url)
   if (http_type(response) == "application/json") {
     feriados <- content(response, "parsed")
@@ -57,7 +57,9 @@ current_hour <- hour(with_tz(
   )
 
 
-get_day_to = function(today, current_hour, feriados=NULL){
+
+
+get_day = function(today, current_hour, feriados){
   day_of_week <- weekdays(today)
   if (day_of_week == "sábado" || day_of_week == "Saturday") {
     today <- format(as.Date(today) - days(1), format = "%Y-%m-%d")
@@ -77,7 +79,7 @@ get_day_to = function(today, current_hour, feriados=NULL){
       fecha_final = as.Date(today)
     }
     
-    if (!is.na(feriados)){
+    if (length(feriados)>0){
       while (TRUE) {
         if (fecha_final %in% feriados) {
           fecha_final <- as.Date(fecha_final) - 1
@@ -101,9 +103,9 @@ get_day_to = function(today, current_hour, feriados=NULL){
 
 
 
-to = get_day_to(today, current_hour)
+to = get_day(today, current_hour, fechas_feriados)
 from = to - years(1)
-from_historic = from
+from_historic = get_day(from, current_hour, fechas_feriados)
 
 
 url_ccl = "https://mercados.ambito.com//dolarrava/cl/historico-general/"
@@ -445,6 +447,51 @@ get_icon_arrow = function(df){
 
 
 
+
+barplot_brecha_cambiaria = function(data, fecha, text){
+  highchart() %>%
+    hc_chart(type = "column") %>%
+    hc_title(text = text) %>%
+    hc_xAxis(categories = fecha) %>%
+    hc_yAxis(title = list(text = "Brecha")) %>%
+    hc_add_series(name = "brecha", 
+                  data = data,
+                  color = "#007bff") %>% 
+    highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
+    highcharter::hc_legend(enabled = FALSE) %>%
+    highcharter::hc_xAxis(
+      title = list(text = ""),
+      reversed = FALSE,
+      labels = list(
+        style = list(color = "black", fontWeight = "bold")
+      )
+    ) %>%
+    highcharter::hc_yAxis(
+      title = list(text = "% Brecha",
+                   style = list(color = "black", fontWeight = "bold")),
+      gridLineWidth = 0,
+      reversed = FALSE,
+      labels = list(
+        style = list(color = "black", fontWeight = "bold")
+      )
+    ) %>%
+    
+    highcharter::hc_caption(
+      text = paste0(text),
+      style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
+    highcharter::hc_tooltip(
+      crosshairs = TRUE,
+      backgroundColor = "#F0F0F0",
+      shared = TRUE, 
+      borderWidth = 5
+    ) %>% 
+    hc_title(
+      text = paste0('Brecha Cambiaria.'),
+      style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+}
+
+
+
 get_table = function(df){
   return(
     reactable::reactable(
@@ -640,7 +687,7 @@ ui <- dashboardPage(
                 dateRangeInput(
                   "daterangebrechas", 
                   label = "Rango de Fechas",
-                  start  = from,
+                  start  =  from,
                   end    = to,
                   min    = from,
                   max    = to,
@@ -648,7 +695,14 @@ ui <- dashboardPage(
                   separator = " - ",
                   language = "es"
                 )
-              )
+              ),
+                radioButtons(
+                  "filterdays",
+                  "Opciones:",
+                  choices = c("Anual", "Ultimos 10 dias"),
+                  inline = F,
+                  selected = "Anual")
+              
             )
           ),
           column(
@@ -1191,48 +1245,21 @@ server <- function(input, output,session) {
   
   output$barplot_mepvsoficial <- renderHighchart({
     
-    mepvsoficialfilter = mepvsoficial() %>% 
-      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    if (input$filterdays=="Anual"){
+      mepvsoficialfilter = mepvsoficial() %>% 
+        filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    } else {
+      mepvsoficialfilter = mepvsoficial() %>% 
+        filter(Fecha >= get_day(to - 10, current_hour, fechas_feriados))
+    }
     
-    highchart() %>%
-      hc_chart(type = "column") %>%
-      hc_title(text = "Brecha Dolar Mep vs Oficial") %>%
-      hc_xAxis(categories = mepvsoficialfilter$Fecha) %>%
-      hc_yAxis(title = list(text = "Brecha")) %>%
-      hc_add_series(name = "brecha", 
-                    data = mepvsoficialfilter$brecha,
-                    color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
-      highcharter::hc_legend(enabled = FALSE) %>%
-      highcharter::hc_xAxis(
-        title = list(text = ""),
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      highcharter::hc_yAxis(
-        title = list(text = "% Brecha",
-                     style = list(color = "black", fontWeight = "bold")),
-        gridLineWidth = 0,
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      
-      highcharter::hc_caption(
-        text = paste0("Brecha Mep vs Oficial."),
-        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
-      highcharter::hc_tooltip(
-        crosshairs = TRUE,
-        backgroundColor = "#F0F0F0",
-        shared = TRUE, 
-        borderWidth = 5
-      ) %>% 
-      hc_title(
-        text = paste0('Brecha Cambiaria.'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+    
+    barplot_brecha_cambiaria(
+      data = mepvsoficialfilter$brecha,
+      fecha = mepvsoficialfilter$Fecha,
+      text = "Brecha Dolar Mep vs Oficial"
+    )
+    
   })
   
   
@@ -1240,47 +1267,20 @@ server <- function(input, output,session) {
   
   output$barplot_bluevsoficial <- renderHighchart({
     
-    bluevsoficialfilter = bluevsoficial() %>% 
-      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    if (input$filterdays=="Anual"){
+      bluevsoficialfilter = bluevsoficial() %>% 
+        filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    } else {
+      bluevsoficialfilter = bluevsoficial() %>% 
+        filter(Fecha >= get_day(to - 10, current_hour, fechas_feriados))
+    }
     
-    highchart() %>%
-      hc_chart(type = "column") %>%
-      hc_title(text = "Brecha Dolar Blue vs Oficial") %>%
-      hc_xAxis(categories = bluevsoficialfilter$Fecha) %>%
-      hc_yAxis(title = list(text = "Brecha")) %>%
-      hc_add_series(name = "brecha", 
-                    data = bluevsoficialfilter$brecha,
-                    color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
-      highcharter::hc_legend(enabled = FALSE) %>%
-      highcharter::hc_xAxis(
-        title = list(text = ""),
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      highcharter::hc_yAxis(
-        title = list(text = "% Brecha",
-                     style = list(color = "black", fontWeight = "bold")),
-        gridLineWidth = 0,
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      highcharter::hc_caption(
-        text = paste0("Brecha Blue vs Oficial."),
-        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
-      highcharter::hc_tooltip(
-        crosshairs = TRUE,
-        backgroundColor = "#F0F0F0",
-        shared = TRUE, 
-        borderWidth = 5
-      ) %>% 
-      hc_title(
-        text = paste0('Brecha Cambiaria.'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+    barplot_brecha_cambiaria(
+      data = bluevsoficialfilter$brecha,
+      fecha = bluevsoficialfilter$Fecha,
+      text = "Brecha Dolar Blue vs Oficial"
+    )
+    
   })
   
   
@@ -1290,49 +1290,20 @@ server <- function(input, output,session) {
   
   output$barplot_bluevsmep <- renderHighchart({
     
-    bluevsmepfilter = bluevsmep() %>% 
-      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    if (input$filterdays=="Anual"){
+      bluevsmepfilter = bluevsmep() %>% 
+        filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    } else {
+      bluevsmepfilter = bluevsmep() %>% 
+        filter(Fecha >= get_day(to - 10, current_hour, fechas_feriados))
+    }
     
-    highchart() %>%
-      hc_chart(type = "column") %>%
-      hc_title(text = "Brecha Dolar Blue vs Mep") %>%
-      hc_xAxis(categories = bluevsmepfilter$Fecha) %>%
-      hc_yAxis(title = list(text = "Brecha")) %>%
-      hc_add_series(name = "brecha", 
-                    data = bluevsmepfilter$brecha,
-                    color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
-      highcharter::hc_legend(enabled = FALSE) %>%
-      highcharter::hc_xAxis(
-        title = list(text = ""),
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      highcharter::hc_yAxis(
-        title = list(text = "% Brecha",
-                     style = list(color = "black", fontWeight = "bold")),
-        gridLineWidth = 0,
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      
-      highcharter::hc_caption(
-        text = paste0("Brecha Blue vs Mep"),
-        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
-      highcharter::hc_tooltip(
-        crosshairs = TRUE,
-        backgroundColor = "#F0F0F0",
-        shared = TRUE, 
-        borderWidth = 5
-      ) %>% 
-      hc_title(
-        text = paste0('Brecha Cambiaria.'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
-
+    barplot_brecha_cambiaria(
+      data = bluevsmepfilter$brecha,
+      fecha = bluevsmepfilter$Fecha,
+      text = "Brecha Dolar Blue vs Mep"
+    )
+    
   })
   
   
@@ -1340,48 +1311,19 @@ server <- function(input, output,session) {
   
   output$barplot_cclvsoficial <- renderHighchart({
     
-    cclvsoficialfilter = cclvsoficial() %>% 
-      filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    if (input$filterdays=="Anual"){
+      cclvsoficialfilter = cclvsoficial() %>% 
+        filter(Fecha >= input$daterangebrechas[1], Fecha <= input$daterangebrechas[2])
+    } else {
+      cclvsoficialfilter = cclvsoficial() %>% 
+        filter(Fecha >= get_day(to - 10, current_hour, fechas_feriados))
+    }
     
-    highchart() %>%
-      hc_chart(type = "column") %>%
-      hc_title(text = "Brecha Dolar CCL vs Oficial") %>%
-      hc_xAxis(categories = cclvsoficialfilter$Fecha) %>%
-      hc_yAxis(title = list(text = "Brecha")) %>%
-      hc_add_series(name = "brecha", 
-                    data = cclvsoficialfilter$brecha,
-                    color = "#007bff") %>% 
-      highcharter::hc_tooltip(crosshairs = TRUE, pointFormat = "Brecha: % {point.y}",valueDecimals=2) %>%
-      highcharter::hc_legend(enabled = FALSE) %>%
-      highcharter::hc_xAxis(
-        title = list(text = ""),
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      highcharter::hc_yAxis(
-        title = list(text = "% Brecha",
-                     style = list(color = "black", fontWeight = "bold")),
-        gridLineWidth = 0,
-        reversed = FALSE,
-        labels = list(
-          style = list(color = "black", fontWeight = "bold")
-        )
-      ) %>%
-      
-      highcharter::hc_caption(
-        text = paste0("Brecha CCL vs Oficial"),
-        style = list(fontSize = '12px', fontWeight = 'bold', color = "black")) %>%
-      highcharter::hc_tooltip(
-        crosshairs = TRUE,
-        backgroundColor = "#F0F0F0",
-        shared = TRUE, 
-        borderWidth = 5
-      ) %>% 
-      hc_title(
-        text = paste0('Brecha Cambiaria.'),
-        style = list(fontSize = '16px', fontWeight = 'bold', color = "black")) 
+    barplot_brecha_cambiaria(
+      data = cclvsoficialfilter$brecha,
+      fecha = cclvsoficialfilter$Fecha,
+      text = "Brecha Dolar CCL vs Oficial"
+    )
     
   })
   

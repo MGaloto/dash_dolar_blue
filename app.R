@@ -525,6 +525,7 @@ get_table = function(df){
 
 
 ui <- dashboardPage(
+  title = "Dashboard Dolar Argentina",
   options = F,
   header = dashboardHeader(
     skin = "dark",

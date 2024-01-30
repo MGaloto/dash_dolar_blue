@@ -8,3 +8,4 @@ dash.Rmd
 .Rproj.user
 exapp
 etl2.Rmd
+.env

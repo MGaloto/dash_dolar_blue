@@ -26,16 +26,25 @@ today = as.Date(format(
 year = year(today)
 
 obtener_feriados_argentina <- function(anio) {
-  url <- paste("https://nolaborables.com.ar/api/v2/feriaAdos/", anio, "?incluir=opcional", sep = "")
-  response <- GET(url)
-  if (http_type(response) == "application/json") {
-    feriados <- content(response, "parsed")
-    return(feriados)
-  } else {
-    warning("No se pudo obtener la información de los feriados.")
+  url <- paste("https://nolaborables.com.ar/api/v2/feriados/", anio, "?incluir=opcional", sep = "")
+  
+  resultado <- tryCatch({
+    response <- GET(url)
+    if (http_type(response) == "application/json") {
+      feriados <- content(response, "parsed")
+      return(feriados)
+    } else {
+      warning("No se pudo obtener la información de los feriados.")
+      return(NULL)
+    }
+  }, error = function(e) {
+    warning("Ocurrió un error al intentar obtener los feriados: ", e$message)
     return(NULL)
-  }
+  })
+  
+  return(resultado)
 }
+
 
 
 if (obtener_feriados == TRUE){

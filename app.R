@@ -1189,15 +1189,36 @@ server <- function(input, output,session) {
   
   
   output$timeserie <- renderHighchart({
-    
-    if (input$opciones == "Anual"){
+        
+    if (input$opciones == "Anual") {
+      
       dolar_merge_filter = dolar_merge() %>% 
-        filter(Fecha >= input$daterange[1], Fecha <= input$daterange[2])
-    } else {
-      dolar_merge_filter = dolar_merge() %>% arrange(Fecha)
-      dolar_merge_filter = tail(dolar_merge_filter, 7)
-    }
+        filter(Fecha >= input$daterange[1], 
+               Fecha <= input$daterange[2]) %>%
+        mutate(
+          ccl = na_if(ccl, 0),
+          mep = na_if(mep, 0),
+          informal = na_if(informal, 0),
+          oficial = na_if(oficial, 0),
+          tarjeta = na_if(tarjeta, 0)
+        ) %>%
+        fill(ccl, mep, informal, oficial, tarjeta, .direction = "down")
     
+    } else {
+      
+      dolar_merge_filter = dolar_merge() %>% 
+        arrange(Fecha) %>% 
+        tail(7) %>%
+        mutate(
+          ccl = na_if(ccl, 0),
+          mep = na_if(mep, 0),
+          informal = na_if(informal, 0),
+          oficial = na_if(oficial, 0),
+          tarjeta = na_if(tarjeta, 0)
+        ) %>%
+        fill(ccl, mep, informal, oficial, tarjeta, .direction = "down")
+    }
+        
     
     
     highchart() %>%
